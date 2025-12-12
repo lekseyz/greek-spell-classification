@@ -1,3 +1,5 @@
+using Domain.Exceptions;
+
 namespace Domain.Models;
 
 public class NeuralNetworkConfig
@@ -39,4 +41,72 @@ public class NeuralNetworkConfig
 	/// Included as this is a critical parameter for any network configuration.
 	/// </summary>
 	public float LearningRate { get; set; } = 0.01f;
+	
+	
+	
+	/// <summary>
+    /// Validates the configuration state.
+    /// </summary>
+    /// <exception cref="InvalidNNConfigException">Thrown if any parameter is invalid.</exception>
+    public void Validate()
+    {
+        if (InputSize <= 0)
+        {
+            throw new InvalidNNConfigException(
+                nameof(InputSize), 
+                "Input size must be greater than 0.");
+        }
+
+        if (OutputClasses <= 0)
+        {
+            throw new InvalidNNConfigException(
+                nameof(OutputClasses), 
+                "Number of output classes must be greater than 0.");
+        }
+
+        if (HiddenLayerNeurons == null)
+        {
+            throw new InvalidNNConfigException(
+                nameof(HiddenLayerNeurons), 
+                "Hidden layers array cannot be null.");
+        }
+
+        for (int i = 0; i < HiddenLayerNeurons.Length; i++)
+        {
+            if (HiddenLayerNeurons[i] <= 0)
+            {
+                throw new InvalidNNConfigException(
+                    nameof(HiddenLayerNeurons), 
+                    $"Hidden layer at index {i} has invalid neuron count ({HiddenLayerNeurons[i]}). Must be > 0.");
+            }
+        }
+
+        if (LearningRate <= 0.0f || LearningRate > 1.0f)
+        {
+            throw new InvalidNNConfigException(
+                nameof(LearningRate), 
+                $"Value {LearningRate} is invalid. It must be between 0 (exclusive) and 1.");
+        }
+
+        if (Epochs <= 0)
+        {
+            throw new InvalidNNConfigException(
+                nameof(Epochs), 
+                "Epoch count must be greater than 0.");
+        }
+
+        if (TrainingSampleSize < 0)
+        {
+            throw new InvalidNNConfigException(
+                nameof(TrainingSampleSize), 
+                "Training sample size cannot be negative.");
+        }
+
+        if (AcceptableError < 0.0f)
+        {
+            throw new InvalidNNConfigException(
+                nameof(AcceptableError), 
+                "Acceptable error threshold cannot be negative.");
+        }
+    }
 }
