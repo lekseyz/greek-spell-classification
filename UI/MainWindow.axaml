@@ -71,19 +71,71 @@
                     
                     <Separator Background="#3E3E42" Height="1" Margin="0,10"/>
                     
-                    <StackPanel Spacing="5" 
-                                Classes="conditional-box" 
-                                IsEnabled="{Binding IsMlpSettingsEnabled}">
-    
-                        <TextBlock Text="Настройки MLP" Classes="text-primary"/>
-    
-                        <TextBlock Text="Количество эпох:" Classes="text-secondary"/>
-                        <NumericUpDown Value="100" Minimum="1" Maximum="1000"/>
-    
-                        <TextBlock Text="Скорость обучения:" FontSize="12"/>
-                        <TextBox Text="0.01" />
+                    <StackPanel Spacing="8" 
+                        Classes="conditional-box" 
+                        IsEnabled="{Binding IsMlpSettingsEnabled}">
 
-                        <Button Content="Переобучить сеть" HorizontalAlignment="Stretch"/>
+                        <TextBlock Text="Настройки MLP" 
+                                   Classes="text-primary" 
+                                   FontWeight="Bold" 
+                                   Margin="0,0,0,5"/>
+                        
+                        <TextBlock Text="Количество эпох:" Classes="text-secondary"/>
+                        <NumericUpDown Value="{Binding Epochs}" 
+                                       Minimum="1" Maximum="10000" Increment="10"/>
+                        
+                        <TextBlock Text="Размер выборки (на класс):" Classes="text-secondary"/>
+                        <NumericUpDown Value="{Binding TrainingSampleSize}" 
+                                       Minimum="1" Maximum="5000" Increment="1"/>
+                        
+                        <TextBlock Text="Скорость обучения (LR):" Classes="text-secondary"/>
+                        <NumericUpDown Value="{Binding LearningRateUi}" 
+                                       Minimum="0.0001" Maximum="1.0" Increment="0.001"
+                                       FormatString="0.0000"/>
+                        
+                        <TextBlock Text="Допустимая ошибка:" Classes="text-secondary"/>
+                        <NumericUpDown Value="{Binding AcceptableErrorUi}" 
+                                       Minimum="0.0" Maximum="1.0" Increment="0.01"
+                                       FormatString="P0"/>
+                        
+                        <Separator Background="#3E3E42" Height="1" Margin="0,10"/>
+                        <TextBlock Text="Архитектура слоев:" Classes="text-primary" FontWeight="Bold"/>
+                        
+                        <ItemsControl ItemsSource="{Binding EditableHiddenLayers}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="*, Auto" Margin="0,0,0,5">
+                                        <TextBlock Text="Нейронов в слое:" 
+                                                   VerticalAlignment="Center" 
+                                                   FontSize="12" Foreground="Gray"/>
+                                        
+                                        <NumericUpDown Grid.Column="1" 
+                                                       Value="{Binding Neurons}" 
+                                                       Minimum="1" Maximum="2048" Increment="16"
+                                                       Width="110"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        
+                        <Grid ColumnDefinitions="*, 5, *">
+                            <Button Grid.Column="0" 
+                                    Content="+ Слой" 
+                                    Command="{Binding AddLayerCommand}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                            
+                            <Button Grid.Column="2" 
+                                    Content="- Слой" 
+                                    Command="{Binding RemoveLayerCommand}"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                        </Grid>
+                        
+                        <Separator Background="#3E3E42" Height="1" Margin="0,10"/>
+                        
+                        <Button Content="Переобучить сеть" 
+                                HorizontalAlignment="Stretch" 
+                                HorizontalContentAlignment="Center"/>
+
                     </StackPanel>
 
                 </StackPanel>
