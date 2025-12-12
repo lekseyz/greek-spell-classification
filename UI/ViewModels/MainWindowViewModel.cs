@@ -1,6 +1,7 @@
 using ReactiveUI;
 using Avalonia.Media.Imaging;
 using System.Reactive;
+using Domain.Models;
 
 namespace UI.ViewModels
 {
@@ -12,6 +13,20 @@ namespace UI.ViewModels
         private string _statusInfo = "Система готова";
         private int _selectedModelIndex = 0;
 
+        public NeuralNetworkConfig Config { get; } = new NeuralNetworkConfig();
+
+        public int SelectedModelIndex
+        {
+            get => _selectedModelIndex;
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _selectedModelIndex, value);
+                this.RaisePropertyChanged(nameof(IsMlpSettingsEnabled));
+            }
+        }
+
+        public bool IsMlpSettingsEnabled => SelectedModelIndex == 0;
+        
         // Картинка с камеры (биндится к <Image>)
         public Bitmap? CameraFeed
         {
@@ -31,13 +46,6 @@ namespace UI.ViewModels
         {
             get => _confidence;
             set => this.RaiseAndSetIfChanged(ref _confidence, value);
-        }
-        
-        // Индекс выбранной модели в ComboBox
-        public int SelectedModelIndex
-        {
-            get => _selectedModelIndex;
-            set => this.RaiseAndSetIfChanged(ref _selectedModelIndex, value);
         }
 
         // Статус бар внизу
