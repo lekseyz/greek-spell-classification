@@ -4,5 +4,7 @@ namespace Domain;
 
 public interface IGreekClassifier
 {
-	PredictionResult Predict(float[] pixelData);
+	PredictionResult Predict(GreekSymbolImage image);
+
+	void Train(List<(GreekSymbolImage image, GreekLetter label)> dataset);
 }
