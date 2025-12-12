@@ -33,6 +33,13 @@
                     <TextBlock Text="Настройки ML" Classes="text-primary"/>
                     <Separator Background="#3E3E42" Height="1"/>
 
+                    <Button Content="Сгенерировать датасет"
+                            Command="{Binding GenerateDatasetCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Margin="0, 5, 0, 0"
+                            Classes="Primary"/>
+                    
                     <TextBlock Text="Выбор нейросети:" Classes="text-secondary"/>
                     <ComboBox SelectedIndex="{Binding SelectedModelIndex}" HorizontalAlignment="Stretch">
                         <ComboBoxItem>Самописная (MLP)</ComboBoxItem>

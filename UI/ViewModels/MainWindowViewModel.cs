@@ -1,8 +1,12 @@
+using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq; // Нужно для метода Select при синхронизации
 using ReactiveUI;
 using Avalonia.Media.Imaging;
 using System.Reactive;
+using System.Threading.Tasks;
+using Domain;
 using Domain.Models; // Убедитесь, что тут лежит NeuralNetworkConfigDto
 using UI.DTOs;
 
@@ -24,6 +28,8 @@ namespace UI.ViewModels
 
     public class MainWindowViewModel : ViewModelBase
     {
+		private readonly IDatasetGenerator _datasetGenerator;
+		
         // Хранилище данных (DTO)
         private NeuralNetworkConfigDto _config = new NeuralNetworkConfigDto();
 
@@ -41,9 +47,12 @@ namespace UI.ViewModels
         public ReactiveCommand<Unit, Unit> CaptureCommand { get; }
         public ReactiveCommand<Unit, Unit> AddLayerCommand { get; }
         public ReactiveCommand<Unit, Unit> RemoveLayerCommand { get; }
+		public ReactiveCommand<Unit, Unit> GenerateDatasetCommand { get; }
 
         public MainWindowViewModel()
         {
+			_datasetGenerator = ServiceLocator.DatasetGenerator;
+			
             // Инициализация слоев из конфига (если там что-то есть по умолчанию)
             if (_config.HiddenLayerNeurons != null)
             {
@@ -76,6 +85,24 @@ namespace UI.ViewModels
                 StatusInfo = "Изображение захвачено и добавлено в обучение!";
                 // Тут будет логика сохранения кадра
             });
+			
+			GenerateDatasetCommand = ReactiveCommand.CreateFromTask(async () =>
+			{
+				StatusInfo = "Generating and augmenting dataset... Please wait.";
+                
+				// Define paths
+				string rawPath = Path.Combine(AppContext.BaseDirectory, "dataset"); 
+				string outputPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed");
+                
+				// Execute generation on a background thread to keep the UI responsive
+				await Task.Run(() => 
+				{
+					// Call the real implementation
+					_datasetGenerator.ProcessAndExport(rawPath, outputPath);
+				});
+                
+				StatusInfo = $"Dataset successfully generated and saved to {outputPath}.";
+			});
         }
 
         // Метод синхронизации: UI (EditableHiddenLayers) -> DTO (_config)

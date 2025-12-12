@@ -35,6 +35,17 @@
                 </Transitions>
             </Setter>
         </Style>
+        
+        <Style Selector="Button.Primary">
+            <Setter Property="Background" Value="#E3D0B9"/>
+            <Setter Property="Foreground" Value="#181818"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        
+        <Style Selector="Button.Primary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#9E8C76"/>
+            <Setter Property="Foreground" Value="#181818"/>
+        </Style>
 
         <Style Selector="StackPanel.conditional-box:disabled">
             <Setter Property="Opacity" Value="0.3"/> 
