@@ -1,6 +1,7 @@
 using ReactiveUI;
 using Avalonia.Media.Imaging;
 using System.Reactive;
+using Domain.Models;
 
 namespace UI.ViewModels
 {
@@ -11,6 +12,8 @@ namespace UI.ViewModels
         private double _confidence = 0;
         private string _statusInfo = "Система готова";
         private int _selectedModelIndex = 0;
+
+        public NeuralNetworkConfig Config { get; } = new NeuralNetworkConfig();
 
         public int SelectedModelIndex
         {
