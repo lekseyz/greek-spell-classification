@@ -3,6 +3,8 @@ using System;
 using Avalonia.ReactiveUI;
 using DataProcessing;
 using Domain;
+using Domain.Models;
+using Ml;
 
 namespace UI;
 
@@ -10,11 +12,20 @@ namespace UI;
 public static class ServiceLocator
 {
 	public static IDatasetGenerator DatasetGenerator { get; private set; }
+	private static IGreekClassifier _currentGreekClassifier;
 
 	public static void Initialize()
 	{
 		// Concrete realization of the dependency
 		DatasetGenerator = new DatasetProcessor();
+	}
+	
+	public static IGreekClassifier GetClassifier(NeuralNetworkConfig config)
+	{
+		// Перезаписываем текущий экземпляр сети, чтобы в дальнейшем 
+		// при вызове GreekClassifier всегда возвращалась последняя обученная/сконфигурированная сеть.
+		_currentGreekClassifier = new CustomNeuralNetwork(config);
+		return _currentGreekClassifier;
 	}
 }
 

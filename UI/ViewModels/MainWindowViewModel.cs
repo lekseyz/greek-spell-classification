@@ -28,7 +28,8 @@ namespace UI.ViewModels
 
     public class MainWindowViewModel : ViewModelBase
     {
-		private readonly IDatasetGenerator _datasetGenerator;
+		private readonly	IDatasetGenerator	_datasetGenerator;
+		private				IGreekClassifier	_currentClassifier;
 		
         // Хранилище данных (DTO)
         private NeuralNetworkConfigDto _config = new NeuralNetworkConfigDto();
@@ -48,6 +49,8 @@ namespace UI.ViewModels
         public ReactiveCommand<Unit, Unit> AddLayerCommand { get; }
         public ReactiveCommand<Unit, Unit> RemoveLayerCommand { get; }
 		public ReactiveCommand<Unit, Unit> GenerateDatasetCommand { get; }
+		public ReactiveCommand<Unit, Unit> TrainNetworkCommand { get; }  
+		public ReactiveCommand<Unit, Unit> TestNetworkCommand { get; }
 
         public MainWindowViewModel()
         {
@@ -103,6 +106,89 @@ namespace UI.ViewModels
                 
 				StatusInfo = $"Dataset successfully generated and saved to {outputPath}.";
 			});
+			
+			TrainNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
+                {
+                    StatusInfo = "Error: Custom network must be selected for training.";
+                    return;
+                }
+                StatusInfo = "Starting custom network training. Loading training data...";
+
+                string trainPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed", "train");
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        SyncLayersToDto(); // Синхронизируем настройки UI с DTO перед обучением
+                        var trainDataset = _datasetGenerator.LoadDataset(trainPath); 
+
+                        if (trainDataset.Count == 0)
+                        {
+                            StatusInfo = $"Error: No training samples found in {trainPath}. Generate dataset first.";
+                            return; 
+                        }
+						
+						
+						NeuralNetworkConfig config = new NeuralNetworkConfig();
+						config.InputSize = _config.InputSize;
+						config.HiddenLayerNeurons = _config.HiddenLayerNeurons.ToArray();
+						config.TrainingSampleSize = _config.TrainingSampleSize;
+						config.Epochs = _config.Epochs;
+						config.OutputClasses = _config.OutputClasses;
+						config.AcceptableError = _config.AcceptableError;
+						config.LearningRate = _config.LearningRate;
+
+
+                        _currentClassifier = ServiceLocator.GetClassifier(config); // Получаем новый классификатор с текущей конфигурацией
+                        _currentClassifier.Train(trainDataset);
+
+                        StatusInfo = $"Network retraining completed. Total samples: {trainDataset.Count}.";
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusInfo = $"Training failed: {ex.Message}";
+                    }
+                });
+            });
+
+            // НОВАЯ РЕАЛИЗАЦИЯ: Команда для кнопки "Тестировать сеть"
+            TestNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
+                {
+                    StatusInfo = "Error: Custom network must be selected for testing.";
+                    return;
+                }
+                StatusInfo = "Loading test dataset and running test... Please wait.";
+
+                string testPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed", "test");
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        var testDataset = _datasetGenerator.LoadDataset(testPath); 
+
+                        if (testDataset.Count == 0)
+                        {
+                            StatusInfo = $"Error: No test samples found in {testPath}. Generate dataset first.";
+                            return; 
+                        }
+
+                        // Тестируем текущий экземпляр классификатора
+                        float accuracy = _currentClassifier.Test(testDataset);
+                        
+                        StatusInfo = $"Test complete. Accuracy: {accuracy:P2} over {testDataset.Count} samples.";
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusInfo = $"Testing failed: {ex.Message}";
+                    }
+                });
+            });
         }
 
         // Метод синхронизации: UI (EditableHiddenLayers) -> DTO (_config)

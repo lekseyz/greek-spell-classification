@@ -97,7 +97,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 			throw new InvalidInputDataException(_layerSizes[0], pixelData.Length);
 
 		// 1. Preprocessing
-		float[] currentSignal = BinarizeInput(pixelData);
+		float[] currentSignal = pixelData;
 
 		// 2. Forward Pass
 		for (int i = 0; i < _weights.Count; i++)
@@ -110,7 +110,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 			if (i == _weights.Count - 1)
 				currentSignal = Softmax(nextSignal);
 			else
-				currentSignal = ApplyActivation(nextSignal, Sigmoid);
+				currentSignal = ApplyActivation(nextSignal, Tanh);
 		}
 
 		// 3. Result
@@ -118,10 +118,51 @@ public class CustomNeuralNetwork : IGreekClassifier
     
 		return new PredictionResult
 		{
-			Symbol = (GreekLetter)maxIndex,
+			Symbol = (GreekLetter)(maxIndex + 1),
 			Confidence = currentSignal[maxIndex],
 			ModelUsed = $"Custom DNN ({_weights.Count} layers)"
 		};
+	}
+	
+	/// <summary>
+	/// Tests the neural network using the provided dataset and returns the accuracy (percentage of correct predictions).
+	/// </summary>
+	/// <param name="dataset">A list of testing pairs.</param>
+	/// <returns>The accuracy of the model as a float (0.0 to 1.0).</returns>
+	public float Test(List<(GreekSymbolImage image, GreekLetter label)> dataset)
+	{
+		if (dataset == null || dataset.Count == 0) return 0.0f;
+
+		int correctCount = 0;
+		int totalCount = dataset.Count;
+
+		// Использование существующего метода Predict для каждого образца
+		foreach (var sample in dataset)
+		{
+			// Predict уже выполняет предобработку (BinarizeInput)
+			PredictionResult prediction = Predict(sample.image);
+            
+			// Проверка совпадения предсказанного символа с истинной меткой
+			if (prediction.Symbol == sample.label)
+			{
+				correctCount++;
+			}
+		}
+
+		// Расчет точности (правильные / общее)
+		return (float)correctCount / totalCount;
+	}
+	
+	private void Shuffle(List<(GreekSymbolImage image, GreekLetter label)> list)
+	{
+		Random rng = new Random(); // Можно вынести в поле класса
+		int n = list.Count;
+		while (n > 1)
+		{
+			n--;
+			int k = rng.Next(n + 1);
+			(list[k], list[n]) = (list[n], list[k]);
+		}
 	}
 
 	// --------------------------------------------------- TRAINING ---------------------------------------------------
@@ -142,6 +183,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 
 		for (int epoch = 0; epoch < _epochs; epoch++)
 		{
+			Shuffle(dataset);
 			float totalError = 0;
 
 			foreach (var sample in dataset)
@@ -150,7 +192,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 				if (sample.image.Pixels.Length != inputSize) continue;
 
 				// 1. Prepare Input (Binarize) and Target
-				float[] input = BinarizeInput(sample.image.Pixels);
+				float[] input = sample.image.Pixels;
 				float[] target = OneHotEncode(sample.label, _layerSizes.Last());
 
 				// 2. Forward Pass with Caching
@@ -193,7 +235,7 @@ public class CustomNeuralNetwork : IGreekClassifier
             if (i == _weights.Count - 1)
                 activatedSignal = Softmax(weightedSum); // Output
             else
-                activatedSignal = ApplyActivation(weightedSum, Sigmoid); // Hidden
+                activatedSignal = ApplyActivation(weightedSum, Tanh); // Hidden
 
             activations.Add(activatedSignal);
             currentSignal = activatedSignal;
@@ -247,7 +289,8 @@ public class CustomNeuralNetwork : IGreekClassifier
                     // Multiply by derivative of Sigmoid: f'(x) = f(x) * (1 - f(x))
                     // prevLayerActivation[row] holds the sigmoid output
                     float val = prevLayerActivation[row];
-                    prevError[row] = sum * (val * (1.0f - val));
+                    //prevError[row] = sum * (val * (1.0f - val));
+					prevError[row] = sum * (1.0f - val * val);
                 });
             }
 
@@ -283,23 +326,6 @@ public class CustomNeuralNetwork : IGreekClassifier
 	#region Math
 
     /// <summary>
-    /// Converts input pixels to purely 0.0 or 1.0 based on a threshold.
-    /// </summary>
-    private float[] BinarizeInput(float[] input)
-    {
-        // Create a new array to avoid mutating input data
-        float[] result = new float[input.Length];
-        
-        // This loop is very lightweight; Parallel.For might introduce overhead here,
-        // so we stick to a standard for-loop (or SIMD Vector<T> could be used).
-        for (int i = 0; i < input.Length; i++)
-        {
-            result[i] = input[i] > BinarizationThreshold ? 1.0f : 0.0f;
-        }
-        return result;
-    }
-
-    /// <summary>
     /// Performs matrix-vector multiplication using parallel processing.
     /// </summary>
     private float[] MatrixVectorMultiplyParallel(float[] inputVector, float[] weightsMatrix, float[] biases, int rows, int cols)
@@ -329,7 +355,9 @@ public class CustomNeuralNetwork : IGreekClassifier
 	private float[] OneHotEncode(GreekLetter label, int size)
 	{
 		float[] target = new float[size];
-		int index = (int)label;
+		// Сдвигаем: Alpha(1)->0 ... Omega(24)->23
+		int index = (int)label - 1; 
+
 		if (index >= 0 && index < size)
 		{
 			target[index] = 1.0f;
@@ -361,6 +389,12 @@ public class CustomNeuralNetwork : IGreekClassifier
 	/// <param name="x">The input value.</param>
 	/// <returns>A value between 0.0 and 1.0.</returns>
     private float Sigmoid(float x) => 1.0f / (1.0f + (float)Math.Exp(-x));
+	
+	/// <summary>
+	/// Computes the Hyperbolic Tangent (Tanh) activation function for a single scalar value.
+	/// Formula: f(x) = tanh(x). Output range is [-1.0, 1.0].
+	/// </summary>
+	private float Tanh(float x) => (float)Math.Tanh(x);
 
 	/// <summary>
 	/// Applies a specified activation function to every element of the input vector in parallel.

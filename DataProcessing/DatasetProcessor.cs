@@ -4,6 +4,7 @@ using SixLabors.ImageSharp.Processing;
 using Domain;
 using System.IO;
 using System.Linq;
+using Domain.Models;
 
 namespace DataProcessing;
 
@@ -17,15 +18,56 @@ public class DatasetProcessor: IDatasetGenerator
     private const float BinarizationThreshold = 128f; 
     
     // Max displacement for random shifting
-    private const int MaxShift = 2; // Maximum shift of +/- 2 pixels
+    private const int MaxShift = 4; // Maximum shift of +/- 2 pixels
     
     private readonly Random _rng = new Random();
+	
+	public List<(GreekSymbolImage image, GreekLetter label)> LoadDataset(string basePath)
+	{
+		var allSamples = new List<(GreekSymbolImage image, GreekLetter label)>();
+        
+		if (!Directory.Exists(basePath))
+		{
+			Console.WriteLine($"Error: Dataset path not found at {basePath}");
+			return allSamples;
+		}
 
-    /// <summary>
-    /// Loads, binarizes, augments, splits, and exports the dataset.
-    /// </summary>
-    /// <param name="rawDatasetPath">Path to the folder with raw data (e.g., /dataset).</param>
-    /// <param name="outputPath">Path to save the processed dataset (e.g., /dataset_processed).</param>
+		foreach (var dir in Directory.GetDirectories(basePath))
+		{
+			if (!Enum.TryParse<GreekLetter>(Path.GetFileName(dir), true, out var label))
+			{
+				Console.WriteLine($"Skipping directory: {dir}. Does not match GreekLetter enum.");
+				continue;
+			}
+
+			foreach (var file in Directory.GetFiles(dir, "*.png", SearchOption.TopDirectoryOnly))
+			{
+				try
+				{
+					using var image = Image.Load<L8>(file); // Load as Grayscale (8 bit)
+                    
+					// !!! Strict size check (resizing is forbidden) !!!
+					if (image.Width != _width || image.Height != _height)
+					{
+						Console.WriteLine($"Skipping file: {file}. Expected size {_width}x{_height}, but got {image.Width}x{image.Height}.");
+						continue;
+					}
+
+					// Binarization and conversion to float[] using the existing ExtractPixels logic
+					// (Assuming ExtractPixels is accessible, possibly by changing its modifier to public if necessary, but private is fine here as LoadDataset is in the same class and calls it)
+					float[] pixels = ExtractPixels(image);
+					allSamples.Add((new GreekSymbolImage(pixels), label));
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"Error loading file {file}: {ex.Message}");
+				}
+			}
+		}
+
+		return allSamples;
+	}
+
     public void ProcessAndExport(string rawDatasetPath, string outputPath)
     {
         var allSamples = new List<(GreekLetter Label, float[] Pixels)>();
@@ -54,7 +96,7 @@ public class DatasetProcessor: IDatasetGenerator
                     allSamples.Add((label, basePixels));
 
                     // Augmentation (Random Shifting)
-                    var augmented = GenerateAugmented(basePixels, 5); // Generate 5 unique and valid augmented samples
+                    var augmented = GenerateAugmented(basePixels, 30); // Generate 5 unique and valid augmented samples
                     foreach (var augPixels in augmented)
                     {
                         allSamples.Add((label, augPixels));
