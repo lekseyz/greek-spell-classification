@@ -6,6 +6,8 @@ using ReactiveUI;
 using Avalonia.Media.Imaging;
 using System.Reactive;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Platform;
 using Domain;
 using Domain.Models;
 using Ml; // Убедитесь, что тут лежит NeuralNetworkConfigDto
@@ -41,6 +43,13 @@ namespace UI.ViewModels
         private double _confidence = 0;
         private string _statusInfo = "Система готова";
         private int _selectedModelIndex = 0;
+		
+		// --- Рисовалка ---
+		private bool _isDrawingMode;
+		private WriteableBitmap _drawingBitmap;
+		
+		private const int DrawWidth = GreekSymbolConstants.ImageWidth;
+		private const int DrawHeight =  GreekSymbolConstants.ImageHeight;
 
         // --- Коллекция слоев для UI ---
         public ObservableCollection<HiddenLayerVm> EditableHiddenLayers { get; } = new();
@@ -54,10 +63,36 @@ namespace UI.ViewModels
 		public ReactiveCommand<Unit, Unit> TestNetworkCommand { get; }
 		public ReactiveCommand<Unit, Unit> SaveNetworkCommand { get; }
 		public ReactiveCommand<Unit, Unit> LoadNetworkCommand { get; }
+		
+		public ReactiveCommand<Unit, Unit> ToggleSourceCommand { get; }
+		public ReactiveCommand<Unit, Unit> ClearDrawingCommand { get; }
 
         public MainWindowViewModel()
         {
 			_datasetGenerator = ServiceLocator.DatasetGenerator;
+			
+			_drawingBitmap = new WriteableBitmap(new PixelSize(DrawWidth, DrawHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
+			ClearDrawing();
+			
+			ToggleSourceCommand = ReactiveCommand.Create(() =>
+			{
+				IsDrawingMode = !IsDrawingMode;
+				StatusInfo = IsDrawingMode ? "Режим рисования включен." : "Режим камеры включен.";
+                
+				// Если переключились на рисование и там уже что-то есть, можно сразу классифицировать
+				if (IsDrawingMode)
+				{
+					ClassifyDrawing();
+				}
+			});
+
+			// --- Команда очистки холста ---
+			ClearDrawingCommand = ReactiveCommand.Create(() =>
+			{
+				ClearDrawing();
+				ClassifyDrawing();
+				StatusInfo = "Холст очищен.";
+			});
 			
 			SaveNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
@@ -285,6 +320,132 @@ namespace UI.ViewModels
             });
         }
 
+		#region Drawing
+
+		public void ClearDrawing()
+		{
+			// Создаем НОВЫЙ битмап. Это заставит UI гарантированно обновиться через Binding,
+			// так как изменится ссылка на объект.
+			var newBitmap = new WriteableBitmap(
+				new PixelSize(DrawWidth, DrawHeight), 
+				new Vector(96, 96), 
+				PixelFormat.Bgra8888, 
+				AlphaFormat.Opaque);
+
+			using (var buffer = newBitmap.Lock())
+			{
+				unsafe
+				{
+					uint* ptr = (uint*)buffer.Address;
+					int length = DrawWidth * DrawHeight;
+					// Заливка черным
+					for (int i = 0; i < length; i++)
+						ptr[i] = 0xFF000000;
+				}
+			}
+
+			// Присваивание нового объекта вызывает RaiseAndSetIfChanged -> UI обновляется
+			DrawingBitmap = newBitmap; 
+		}
+
+        // Метод рисования линии (вызывается из Code-behind при движении мыши)
+        public void DrawLine(int x0, int y0, int x1, int y1)
+        {
+            using (var buffer = _drawingBitmap.Lock())
+            {
+                unsafe
+                {
+                    uint* ptr = (uint*)buffer.Address;
+                    int stride = buffer.RowBytes / 4; // int stride
+
+                    // Алгоритм Брезенхема
+                    int dx = Math.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+                    int dy = -Math.Abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+                    int err = dx + dy, e2;
+
+                    while (true)
+                    {
+                        if (x0 >= 0 && x0 < DrawWidth && y0 >= 0 && y0 < DrawHeight)
+                        {
+                            // Рисуем белым (255,255,255,255) -> 0xFFFFFFFF
+                            ptr[y0 * stride + x0] = 0xFFFFFFFF;
+                        }
+
+                        if (x0 == x1 && y0 == y1) break;
+                        e2 = 2 * err;
+                        if (e2 >= dy) { err += dy; x0 += sx; }
+                        if (e2 <= dx) { err += dx; y0 += sy; }
+                    }
+                }
+            }
+            this.RaisePropertyChanged(nameof(DrawingBitmap));
+        }
+
+        // Классификация нарисованного
+        public void ClassifyDrawing()
+        {
+            if (_currentClassifier == null)
+            {
+                PredictionResult = "Сеть не готова";
+                return;
+            }
+
+            float[] pixels = new float[DrawWidth * DrawHeight];
+
+            using (var buffer = _drawingBitmap.Lock())
+            {
+                unsafe
+                {
+                    uint* ptr = (uint*)buffer.Address;
+                    int stride = buffer.RowBytes / 4;
+
+                    for (int y = 0; y < DrawHeight; y++)
+                    {
+                        for (int x = 0; x < DrawWidth; x++)
+                        {
+                            uint pixel = ptr[y * stride + x];
+                            // Извлекаем компоненты. PixelFormat.Bgra8888
+                            // B = (pixel & 0xFF)
+                            // G = ((pixel >> 8) & 0xFF)
+                            // R = ((pixel >> 16) & 0xFF)
+                            // Берем R канал (так как рисуем ЧБ, они равны)
+                            byte r = (byte)((pixel >> 16) & 0xFF);
+                            
+                            // Нормализация 0..1
+                            pixels[y * DrawWidth + x] = r / 255.0f;
+                        }
+                    }
+                }
+            }
+
+            try
+            {
+                var image = new GreekSymbolImage(pixels);
+                var result = _currentClassifier.Predict(image);
+                PredictionResult = result.Symbol.ToString();
+                Confidence = result.Confidence * 100;
+            }
+            catch (Exception ex)
+            {
+                PredictionResult = "Ошибка";
+                StatusInfo = ex.Message;
+            }
+        }
+
+		#endregion
+
+		public bool IsDrawingMode
+		{
+			get => _isDrawingMode;
+			set => this.RaiseAndSetIfChanged(ref _isDrawingMode, value);
+		}
+
+		public WriteableBitmap DrawingBitmap
+		{
+			get => _drawingBitmap;
+			set => this.RaiseAndSetIfChanged(ref _drawingBitmap, value);
+		}
+		
         // Метод синхронизации: UI (EditableHiddenLayers) -> DTO (_config)
         // Вызывайте его перед началом обучения
         public void SyncLayersToDto()

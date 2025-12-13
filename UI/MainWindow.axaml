@@ -21,8 +21,43 @@
             <Border Grid.Column="0" 
                     Classes="card">
                 
-                <Image Source="{Binding CameraFeed}" 
-                       Stretch="Uniform"/>
+               <Grid>
+                    <Image Source="{Binding CameraFeed}" 
+                           Stretch="Uniform"
+                           IsVisible="{Binding !IsDrawingMode}"/>
+
+                    <Viewbox Stretch="Uniform" IsVisible="{Binding IsDrawingMode}">
+                        <Grid Width="28" Height="28" Background="Black"
+                              Name="DrawingGrid"
+                              PointerPressed="OnPointerPressed"
+                              PointerMoved="OnPointerMoved"
+                              PointerReleased="OnPointerReleased">
+                            
+                            <Image x:Name="DrawingImage"
+                                   Source="{Binding DrawingBitmap}" 
+                                   Stretch="None"
+                                   RenderOptions.BitmapInterpolationMode="None"/>
+                        </Grid>
+                    </Viewbox>
+                    
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10" Spacing="5">
+                        <Button Command="{Binding ToggleSourceCommand}"
+                                HorizontalAlignment="Left">
+                            <Panel>
+                                <TextBlock Text="Включить камеру" 
+                                           IsVisible="{Binding IsDrawingMode}"/>
+        
+                                <TextBlock Text="Включить рисование" 
+                                           IsVisible="{Binding !IsDrawingMode}"/>
+                            </Panel>
+                        </Button>
+                         
+                         <Button Content="Очистить" 
+                                 Command="{Binding ClearDrawingCommand}"
+                                 IsVisible="{Binding IsDrawingMode}"
+                                 Background="#C42B1C" Foreground="White"/>
+                    </StackPanel>
+                </Grid>
                 
                 </Border>
 
