@@ -150,6 +150,19 @@
                                 HorizontalContentAlignment="Center"
                                 Margin="0, 5, 0, 0"/>
 
+                        <Grid ColumnDefinitions="*, 5, *">
+                            <Button Grid.Column="0"
+                                    Content="Сохранить"
+                                    Command="{Binding SaveNetworkCommand}"
+                                    Classes="Secondary"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+
+                            <Button Grid.Column="2"
+                                    Content="Загрузить"
+                                    Command="{Binding LoadNetworkCommand}"
+                                    Classes="Secondary"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"/>
+                        </Grid>
                     </StackPanel>
 
                 </StackPanel>

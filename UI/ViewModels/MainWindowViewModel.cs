@@ -7,7 +7,8 @@ using Avalonia.Media.Imaging;
 using System.Reactive;
 using System.Threading.Tasks;
 using Domain;
-using Domain.Models; // Убедитесь, что тут лежит NeuralNetworkConfigDto
+using Domain.Models;
+using Ml; // Убедитесь, что тут лежит NeuralNetworkConfigDto
 using UI.DTOs;
 
 namespace UI.ViewModels
@@ -51,10 +52,103 @@ namespace UI.ViewModels
 		public ReactiveCommand<Unit, Unit> GenerateDatasetCommand { get; }
 		public ReactiveCommand<Unit, Unit> TrainNetworkCommand { get; }  
 		public ReactiveCommand<Unit, Unit> TestNetworkCommand { get; }
+		public ReactiveCommand<Unit, Unit> SaveNetworkCommand { get; }
+		public ReactiveCommand<Unit, Unit> LoadNetworkCommand { get; }
 
         public MainWindowViewModel()
         {
 			_datasetGenerator = ServiceLocator.DatasetGenerator;
+			
+			SaveNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (!IsMlpSettingsEnabled)
+                {
+                    StatusInfo = "Ошибка: Для сохранения выберите 'Самописная (MLP)'.";
+                    return;
+                }
+
+                if (_currentClassifier is CustomNeuralNetwork customNet)
+                {
+                    // Для простоты сохраняем в папку приложения. 
+                    // Можно заменить на SaveFileDialog.
+                    string path = Path.Combine(AppContext.BaseDirectory, "custom_model.json");
+                    
+                    await Task.Run(() => 
+                    {
+                        try 
+                        {
+                            customNet.Save(path);
+                            StatusInfo = $"Сеть успешно сохранена в: {path}";
+                        }
+                        catch (Exception ex)
+                        {
+                            StatusInfo = $"Ошибка сохранения: {ex.Message}";
+                        }
+                    });
+                }
+                else
+                {
+                    StatusInfo = "Ошибка: Текущая сеть не инициализирована или не является CustomNeuralNetwork.";
+                }
+            });
+
+            // --- Реализация команды загрузки ---
+            LoadNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
+            {
+                if (!IsMlpSettingsEnabled)
+                {
+                    StatusInfo = "Ошибка: Переключитесь на 'Самописная (MLP)' перед загрузкой.";
+                    return;
+                }
+
+                string path = Path.Combine(AppContext.BaseDirectory, "custom_model.json");
+                if (!File.Exists(path))
+                {
+                    StatusInfo = "Ошибка: Файл сохраненной модели не найден.";
+                    return;
+                }
+
+                StatusInfo = "Загрузка сети...";
+
+                await Task.Run(() =>
+                {
+                    try
+                    {
+                        // 1. Загружаем сеть
+                        var loadedNet = CustomNeuralNetwork.Load(path);
+                        _currentClassifier = loadedNet;
+
+                        // 2. Обновляем DTO и свойства VM для синхронизации UI
+                        var loadedConfig = loadedNet.Config;
+
+                        // Обновляем простые свойства (Dispatcher не обязателен, т.к. ReactiveUI handle property changes)
+                        // Но если возникнут проблемы с потоками, оберните в Dispatcher.UIThread.InvokeAsync
+                        InputSize = loadedConfig.InputSize;
+                        Epochs = loadedConfig.Epochs;
+                        TrainingSampleSize = loadedConfig.TrainingSampleSize;
+                        LearningRateUi = (decimal)loadedConfig.LearningRate;
+                        AcceptableErrorUi = (decimal)loadedConfig.AcceptableError;
+
+                        // Обновляем коллекцию слоев (нужно делать в UI потоке для надежности, или использовать BindingOperations.EnableCollectionSynchronization)
+                        Avalonia.Threading.Dispatcher.UIThread.Invoke(() =>
+                        {
+                            EditableHiddenLayers.Clear();
+                            foreach (var neurons in loadedConfig.HiddenLayerNeurons)
+                            {
+                                EditableHiddenLayers.Add(new HiddenLayerVm(neurons));
+                            }
+                            // Синхронизируем внутренний DTO с UI
+                            SyncLayersToDto();
+                        });
+
+                        StatusInfo = "Сеть и конфигурация успешно загружены!";
+                    }
+                    catch (Exception ex)
+                    {
+                        StatusInfo = $"Ошибка загрузки: {ex.Message}";
+                    }
+                });
+            });
 			
             // Инициализация слоев из конфига (если там что-то есть по умолчанию)
             if (_config.HiddenLayerNeurons != null)

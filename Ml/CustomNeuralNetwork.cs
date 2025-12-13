@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Domain;
 using Domain.Exceptions;
 using Domain.Models;
@@ -11,6 +12,8 @@ namespace Ml;
 /// </summary>
 public class CustomNeuralNetwork : IGreekClassifier
 {
+	public NeuralNetworkConfig Config { get; private set; }
+	
     private readonly List<float[]> _weights = new();
     private readonly List<float[]> _biases = new();
     private readonly List<int> _layerSizes = new();
@@ -33,6 +36,8 @@ public class CustomNeuralNetwork : IGreekClassifier
 		if (config == null) 
 			throw new ArgumentNullException(nameof(config));
 		config.Validate();
+		
+		Config = config;
 
 		_learningRate = config.LearningRate;
 		_epochs = config.Epochs;
@@ -319,6 +324,56 @@ public class CustomNeuralNetwork : IGreekClassifier
             error = prevError;
         }
     }
+
+	#endregion
+
+	// --------------------------------------------------- SAVE/LOAD ---------------------------------------------------
+	#region SaveLoad
+
+	/// <summary>
+	/// Сохраняет текущее состояние сети в файл JSON.
+	/// </summary>
+	public void Save(string filePath)
+	{
+		var state = new NetworkState
+		{
+			Config = this.Config,
+			Weights = this._weights,
+			Biases = this._biases
+		};
+
+		var options = new JsonSerializerOptions { WriteIndented = true };
+		string json = JsonSerializer.Serialize(state, options);
+		File.WriteAllText(filePath, json);
+	}
+
+	/// <summary>
+	/// Загружает сеть из файла JSON.
+	/// </summary>
+	public static CustomNeuralNetwork Load(string filePath)
+	{
+		if (!File.Exists(filePath)) 
+			throw new FileNotFoundException("Файл модели не найден", filePath);
+
+		string json = File.ReadAllText(filePath);
+		var state = JsonSerializer.Deserialize<NetworkState>(json);
+
+		if (state == null || state.Config == null)
+			throw new Exception("Ошибка десериализации файла модели.");
+
+		// Создаем новую сеть на основе загруженного конфига
+		var network = new CustomNeuralNetwork(state.Config);
+
+		// Принудительно устанавливаем загруженные веса и смещения
+		// (очищаем те, что создались рандомно в конструкторе)
+		network._weights.Clear();
+		network._weights.AddRange(state.Weights);
+
+		network._biases.Clear();
+		network._biases.AddRange(state.Biases);
+
+		return network;
+	}
 
 	#endregion
 
