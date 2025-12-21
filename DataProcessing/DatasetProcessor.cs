@@ -64,6 +64,7 @@ public class DatasetProcessor: IDatasetGenerator
 				}
 			}
 		}
+        Shuffle(allSamples);
 
 		return allSamples;
 	}

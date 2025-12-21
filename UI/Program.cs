@@ -20,11 +20,14 @@ public static class ServiceLocator
 		DatasetGenerator = new DatasetProcessor();
 	}
 	
-	public static IGreekClassifier GetClassifier(NeuralNetworkConfig config)
+	public static IGreekClassifier GetClassifier(NeuralNetworkConfig config, int modelIndex)
 	{
 		// Перезаписываем текущий экземпляр сети, чтобы в дальнейшем 
 		// при вызове GreekClassifier всегда возвращалась последняя обученная/сконфигурированная сеть.
-		_currentGreekClassifier = new CustomNeuralNetwork(config);
+		if (modelIndex == 0)
+			_currentGreekClassifier = new CustomNeuralNetwork(config);
+		else
+			_currentGreekClassifier = new MlNetGreekClassifier();
 		return _currentGreekClassifier;
 	}
 }

@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq; // Нужно для метода Select при синхронизации
 using ReactiveUI;
 using Avalonia.Media.Imaging;
 using System.Reactive;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Platform;
@@ -12,6 +14,9 @@ using Domain;
 using Domain.Models;
 using Ml; // Убедитесь, что тут лежит NeuralNetworkConfigDto
 using UI.DTOs;
+using OpenCvSharp;
+using Avalonia.Threading;
+using Avalonia.Media.Imaging;
 
 namespace UI.ViewModels
 {
@@ -29,10 +34,17 @@ namespace UI.ViewModels
         public HiddenLayerVm(int neurons) => Neurons = neurons;
     }
 
+    public enum Classifiers
+    {
+        Custom = 0,
+        NetMl = 1
+    }
+
     public class MainWindowViewModel : ViewModelBase
     {
 		private readonly	IDatasetGenerator	_datasetGenerator;
-		private				IGreekClassifier	_currentClassifier;
+		private				List<IGreekClassifier>	_currentClassifiers;
+        private Classifiers _currentClassifier;
 		
         // Хранилище данных (DTO)
         private NeuralNetworkConfigDto _config = new NeuralNetworkConfigDto();
@@ -43,6 +55,11 @@ namespace UI.ViewModels
         private double _confidence = 0;
         private string _statusInfo = "Система готова";
         private int _selectedModelIndex = 0;
+        
+        // --- Камера ---
+        private VideoCapture? _capture;
+        private CancellationTokenSource? _cameraCts;
+        
 		
 		// --- Рисовалка ---
 		private bool _isDrawingMode;
@@ -70,9 +87,9 @@ namespace UI.ViewModels
         public MainWindowViewModel()
         {
 			_datasetGenerator = ServiceLocator.DatasetGenerator;
-			
 			_drawingBitmap = new WriteableBitmap(new PixelSize(DrawWidth, DrawHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
-			ClearDrawing();
+            _currentClassifiers = new List<IGreekClassifier> { null, new MlNetGreekClassifier() };
+            ClearDrawing();
 			
 			ToggleSourceCommand = ReactiveCommand.Create(() =>
 			{
@@ -102,7 +119,7 @@ namespace UI.ViewModels
                     return;
                 }
 
-                if (_currentClassifier is CustomNeuralNetwork customNet)
+                if (_currentClassifiers[_selectedModelIndex] is CustomNeuralNetwork customNet)
                 {
                     // Для простоты сохраняем в папку приложения. 
                     // Можно заменить на SaveFileDialog.
@@ -126,7 +143,7 @@ namespace UI.ViewModels
                     StatusInfo = "Ошибка: Текущая сеть не инициализирована или не является CustomNeuralNetwork.";
                 }
             });
-
+            
             // --- Реализация команды загрузки ---
             LoadNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
@@ -151,7 +168,7 @@ namespace UI.ViewModels
                     {
                         // 1. Загружаем сеть
                         var loadedNet = CustomNeuralNetwork.Load(path);
-                        _currentClassifier = loadedNet;
+                        _currentClassifiers[1] = loadedNet;
 
                         // 2. Обновляем DTO и свойства VM для синхронизации UI
                         var loadedConfig = loadedNet.Config;
@@ -238,11 +255,11 @@ namespace UI.ViewModels
 			
 			TrainNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
-                if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
+                /*if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
                 {
                     StatusInfo = "Error: Custom network must be selected for training.";
                     return;
-                }
+                }*/
                 StatusInfo = "Starting custom network training. Loading training data...";
 
                 string trainPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed", "train");
@@ -271,8 +288,8 @@ namespace UI.ViewModels
 						config.LearningRate = _config.LearningRate;
 
 
-                        _currentClassifier = ServiceLocator.GetClassifier(config); // Получаем новый классификатор с текущей конфигурацией
-                        _currentClassifier.Train(trainDataset);
+                        _currentClassifiers[_selectedModelIndex] = ServiceLocator.GetClassifier(config, _selectedModelIndex); // Получаем новый классификатор с текущей конфигурацией
+                        _currentClassifiers[_selectedModelIndex].Train(trainDataset);
 
                         StatusInfo = $"Network retraining completed. Total samples: {trainDataset.Count}.";
                     }
@@ -286,11 +303,11 @@ namespace UI.ViewModels
             // НОВАЯ РЕАЛИЗАЦИЯ: Команда для кнопки "Тестировать сеть"
             TestNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
-                if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
+                /*if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
                 {
                     StatusInfo = "Error: Custom network must be selected for testing.";
                     return;
-                }
+                }*/
                 StatusInfo = "Loading test dataset and running test... Please wait.";
 
                 string testPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed", "test");
@@ -308,7 +325,7 @@ namespace UI.ViewModels
                         }
 
                         // Тестируем текущий экземпляр классификатора
-                        float accuracy = _currentClassifier.Test(testDataset);
+                        float accuracy = _currentClassifiers[_selectedModelIndex].Test(testDataset);
                         
                         StatusInfo = $"Test complete. Accuracy: {accuracy:P2} over {testDataset.Count} samples.";
                     }
@@ -384,7 +401,7 @@ namespace UI.ViewModels
         // Классификация нарисованного
         public void ClassifyDrawing()
         {
-            if (_currentClassifier == null)
+            if (_currentClassifiers[_selectedModelIndex] == null)
             {
                 PredictionResult = "Сеть не готова";
                 return;
@@ -421,7 +438,7 @@ namespace UI.ViewModels
             try
             {
                 var image = new GreekSymbolImage(pixels);
-                var result = _currentClassifier.Predict(image);
+                var result = _currentClassifiers[_selectedModelIndex].Predict(image);
                 PredictionResult = result.Symbol.ToString();
                 Confidence = result.Confidence * 100;
             }
@@ -437,7 +454,19 @@ namespace UI.ViewModels
 		public bool IsDrawingMode
 		{
 			get => _isDrawingMode;
-			set => this.RaiseAndSetIfChanged(ref _isDrawingMode, value);
+            set
+            {
+                this.RaiseAndSetIfChanged(ref _isDrawingMode, value);
+
+                if (_isDrawingMode)
+                {
+                    
+                }
+                else
+                {
+                    
+                }
+            }
 		}
 
 		public WriteableBitmap DrawingBitmap
@@ -524,6 +553,7 @@ namespace UI.ViewModels
                 this.RaiseAndSetIfChanged(ref _selectedModelIndex, value);
                 // Уведомляем зависимое свойство
                 this.RaisePropertyChanged(nameof(IsMlpSettingsEnabled));
+                _currentClassifier = (Classifiers)_selectedModelIndex;
             }
         }
 
