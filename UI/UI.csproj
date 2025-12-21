@@ -27,6 +27,8 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="OpenCvSharp4" Version="4.11.0.20250507" />
+    <PackageReference Include="OpenCvSharp4.runtime.ubuntu.22.04-x64" Version="4.6.0-snapshot" />
+    <PackageReference Include="OpenCvSharp4.unofficial.runtime.ubuntu.24.04-x64" Version="4.12.0.20250708" />
   </ItemGroup>
 
   <ItemGroup>

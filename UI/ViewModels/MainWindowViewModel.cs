@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq; // Нужно для метода Select при синхронизации
 using ReactiveUI;
@@ -64,6 +65,10 @@ namespace UI.ViewModels
 		// --- Рисовалка ---
 		private bool _isDrawingMode;
 		private WriteableBitmap _drawingBitmap;
+        
+        // --- Добавить в поля класса ---
+        private DispatcherTimer _cameraTimer;
+        private Mat? _latestFrame; // Хранит последний кадр для обработки
 		
 		private const int DrawWidth = GreekSymbolConstants.ImageWidth;
 		private const int DrawHeight =  GreekSymbolConstants.ImageHeight;
@@ -83,27 +88,38 @@ namespace UI.ViewModels
 		
 		public ReactiveCommand<Unit, Unit> ToggleSourceCommand { get; }
 		public ReactiveCommand<Unit, Unit> ClearDrawingCommand { get; }
-
+        public ReactiveCommand<Unit, Unit> ClassifyCameraCommand { get; }
+        
         public MainWindowViewModel()
         {
 			_datasetGenerator = ServiceLocator.DatasetGenerator;
 			_drawingBitmap = new WriteableBitmap(new PixelSize(DrawWidth, DrawHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
             _currentClassifiers = new List<IGreekClassifier> { null, new MlNetGreekClassifier() };
             ClearDrawing();
+            
+            _cameraTimer = new DispatcherTimer();
+            _cameraTimer.Interval = TimeSpan.FromMilliseconds(33); // ~30 FPS
+            _cameraTimer.Tick += CameraTimer_Tick;
 			
-			ToggleSourceCommand = ReactiveCommand.Create(() =>
-			{
-				IsDrawingMode = !IsDrawingMode;
-				StatusInfo = IsDrawingMode ? "Режим рисования включен." : "Режим камеры включен.";
-                
-				// Если переключились на рисование и там уже что-то есть, можно сразу классифицировать
-				if (IsDrawingMode)
-				{
-					ClassifyDrawing();
-				}
-			});
+            ToggleSourceCommand = ReactiveCommand.Create(() =>
+            {
+                IsDrawingMode = !IsDrawingMode;
+    
+                if (IsDrawingMode)
+                {
+                    StopCamera(); // Выключаем камеру
+                    StatusInfo = "Режим рисования включен.";
+                    ClassifyDrawing();
+                }
+                else
+                {
+                    StartCamera(); // Включаем камеру
+                    StatusInfo = "Режим камеры включен.";
+                }
+            });
 
 			// --- Команда очистки холста ---
+            ClassifyCameraCommand = ReactiveCommand.Create(ClassifyCameraImage);
 			ClearDrawingCommand = ReactiveCommand.Create(() =>
 			{
 				ClearDrawing();
@@ -336,7 +352,150 @@ namespace UI.ViewModels
                 });
             });
         }
+        private void StartCamera()
+        {
+            try
+            {
+                Debug.WriteLine("Попытка запуска камеры...");
+        
+                // Попробуйте явно указать API (DSHOW часто работает лучше на Windows)
+                // Если DSHOW не подчеркивается, добавьте using OpenCvSharp;
+                // Если ошибка - верните просто new VideoCapture(0);
+                if (_capture == null) _capture = new VideoCapture(0); 
 
+                if (_capture.IsOpened())
+                {
+                    Debug.WriteLine($"Камера открыта успешно! Backend: {_capture.GetBackendName()}");
+                    // Настройка разрешения (опционально, может помочь если камера не дает картинку)
+                    _capture.Set(VideoCaptureProperties.FrameWidth, 640);
+                    _capture.Set(VideoCaptureProperties.FrameHeight, 480);
+            
+                    _cameraTimer.Start();
+                }
+                else
+                {
+                    Debug.WriteLine("Capture.IsOpened() вернул false. Камера не найдена по индексу 0.");
+                    StatusInfo = "Не удалось открыть камеру (индекс 0).";
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"КРИТИЧЕСКАЯ ОШИБКА КАМЕРЫ: {ex}");
+                StatusInfo = $"Ошибка камеры: {ex.GetType().Name}";
+            }
+        }
+
+        private void ClassifyCameraImage()
+{
+    if (_latestFrame == null || _latestFrame.Empty()) 
+    {
+        StatusInfo = "Нет изображения с камеры.";
+        return;
+    }
+    
+    if (_currentClassifiers[_selectedModelIndex] == null)
+    {
+        PredictionResult = "Сеть не выбрана";
+        return;
+    }
+
+    try
+    {
+        using var gray = new Mat();
+        // 1. Перевод в оттенки серого
+        Cv2.CvtColor(_latestFrame, gray, ColorConversionCodes.BGR2GRAY);
+
+        // 2. Обрезка по центру (делаем квадрат)
+        int size = Math.Min(gray.Width, gray.Height);
+        int x = (gray.Width - size) / 2;
+        int y = (gray.Height - size) / 2;
+        using var cropped = new Mat(gray, new OpenCvSharp.Rect(x, y, size, size));
+
+        // 3. Ресайз до 28x28
+        using var resized = new Mat();
+        Cv2.Resize(cropped, resized, new OpenCvSharp.Size(28, 28));
+
+        // 4. Бинаризация (Threshold) + Инверсия
+        // BinaryInv делает черные чернила (значения близкие к 0) белыми (255), 
+        // а белую бумагу (255) черной (0). Otsu автоматически подбирает порог.
+        using var binary = new Mat();
+        Cv2.Threshold(resized, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
+
+        // 5. Перевод пикселей в float[] (нормализация 0..1)
+        float[] pixels = new float[28 * 28];
+        
+        // Получаем доступ к байтам изображения (быстрый способ через индексатор для простоты)
+        for (int r = 0; r < 28; r++)
+        {
+            for (int c = 0; c < 28; c++)
+            {
+                // Получаем значение пикселя (0 или 255)
+                byte val = binary.At<byte>(r, c);
+                pixels[r * 28 + c] = val / 255.0f;
+            }
+        }
+
+        // 6. Распознавание
+        var image = new GreekSymbolImage(pixels);
+        var result = _currentClassifiers[_selectedModelIndex].Predict(image);
+        
+        PredictionResult = result.Symbol.ToString();
+        Confidence = result.Confidence * 100;
+        StatusInfo = "Распознано с камеры.";
+    }
+    catch (Exception ex)
+    {
+        StatusInfo = $"Ошибка обработки: {ex.Message}";
+    }
+}
+        
+        private void StopCamera()
+        {
+            _cameraTimer.Stop();
+            _capture?.Dispose();
+            _capture = null;
+            CameraFeed = null; // Очищаем картинку
+        }
+
+        private void CameraTimer_Tick(object? sender, EventArgs e)
+        {
+            if (_capture != null && _capture.IsOpened())
+            {
+                using var frame = new Mat();
+                bool readSuccess = _capture.Read(frame); // Возвращает true/false
+
+                if (!readSuccess)
+                {
+                    Debug.WriteLine("Сбой чтения кадра (_capture.Read вернул false)");
+                    return;
+                }
+
+                if (frame.Empty())
+                {
+                    Debug.WriteLine("Кадр пустой (frame.Empty() == true)");
+                    return;
+                }
+
+                // Если дошли сюда, значит кадр получен. Пробуем конвертировать.
+                try 
+                {
+                    _latestFrame = frame.Clone(); // Сохраняем для нейросети
+
+                    // Конвертация
+                    using (var stream = frame.ToMemoryStream(".bmp")) 
+                    {
+                        stream.Position = 0;
+                        // ВАЖНО: Создание битмапа должно происходить в UI потоке, 
+                        // но DispatcherTimer и так работает в UI потоке.
+                        CameraFeed = new Bitmap(stream);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Ошибка конвертации кадра: {ex.Message}");
+                }
+            }
+        }
 		#region Drawing
 
 		public void ClearDrawing()

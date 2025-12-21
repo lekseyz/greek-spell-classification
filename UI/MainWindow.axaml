@@ -41,21 +41,24 @@
                     </Viewbox>
                     
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Top" HorizontalAlignment="Left" Margin="10" Spacing="5">
-                        <Button Command="{Binding ToggleSourceCommand}"
-                                HorizontalAlignment="Left">
+    
+                        <Button Command="{Binding ToggleSourceCommand}" HorizontalAlignment="Left">
                             <Panel>
-                                <TextBlock Text="Включить камеру" 
-                                           IsVisible="{Binding IsDrawingMode}"/>
-        
-                                <TextBlock Text="Включить рисование" 
-                                           IsVisible="{Binding !IsDrawingMode}"/>
+                                <TextBlock Text="Включить камеру" IsVisible="{Binding IsDrawingMode}"/>
+                                <TextBlock Text="Включить рисование" IsVisible="{Binding !IsDrawingMode}"/>
                             </Panel>
                         </Button>
-                         
-                         <Button Content="Очистить" 
-                                 Command="{Binding ClearDrawingCommand}"
-                                 IsVisible="{Binding IsDrawingMode}"
-                                 Background="#C42B1C" Foreground="White"/>
+    
+                        <Button Content="Очистить" 
+                                Command="{Binding ClearDrawingCommand}"
+                                IsVisible="{Binding IsDrawingMode}"
+                                Background="#C42B1C" Foreground="White"/>
+
+                        <Button Content="Распознать фото" 
+                                Command="{Binding ClassifyCameraCommand}"
+                                IsVisible="{Binding !IsDrawingMode}" 
+                                Background="#007ACC" Foreground="White"/>
+
                     </StackPanel>
                 </Grid>
                 
