@@ -43,8 +43,9 @@ namespace UI.ViewModels
 
     public class MainWindowViewModel : ViewModelBase
     {
-		private readonly	IDatasetGenerator	_datasetGenerator;
+		private readonly	IDatasetGenerator		_datasetGenerator;
 		private				List<IGreekClassifier>	_currentClassifiers;
+		private				IPhotoProcessor			_photoProcessor;
         private Classifiers _currentClassifier;
 		
         // Хранилище данных (DTO)
@@ -93,6 +94,7 @@ namespace UI.ViewModels
         public MainWindowViewModel()
         {
 			_datasetGenerator = ServiceLocator.DatasetGenerator;
+			_photoProcessor = ServiceLocator.PhotoProcessor;
 			_drawingBitmap = new WriteableBitmap(new PixelSize(DrawWidth, DrawHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
             _currentClassifiers = new List<IGreekClassifier> { null, new MlNetGreekClassifier() };
             ClearDrawing();
@@ -386,68 +388,33 @@ namespace UI.ViewModels
         }
 
         private void ClassifyCameraImage()
-{
-    if (_latestFrame == null || _latestFrame.Empty()) 
-    {
-        StatusInfo = "Нет изображения с камеры.";
-        return;
-    }
-    
-    if (_currentClassifiers[_selectedModelIndex] == null)
-    {
-        PredictionResult = "Сеть не выбрана";
-        return;
-    }
-
-    try
-    {
-        using var gray = new Mat();
-        // 1. Перевод в оттенки серого
-        Cv2.CvtColor(_latestFrame, gray, ColorConversionCodes.BGR2GRAY);
-
-        // 2. Обрезка по центру (делаем квадрат)
-        int size = Math.Min(gray.Width, gray.Height);
-        int x = (gray.Width - size) / 2;
-        int y = (gray.Height - size) / 2;
-        using var cropped = new Mat(gray, new OpenCvSharp.Rect(x, y, size, size));
-
-        // 3. Ресайз до 28x28
-        using var resized = new Mat();
-        Cv2.Resize(cropped, resized, new OpenCvSharp.Size(28, 28));
-
-        // 4. Бинаризация (Threshold) + Инверсия
-        // BinaryInv делает черные чернила (значения близкие к 0) белыми (255), 
-        // а белую бумагу (255) черной (0). Otsu автоматически подбирает порог.
-        using var binary = new Mat();
-        Cv2.Threshold(resized, binary, 0, 255, ThresholdTypes.BinaryInv | ThresholdTypes.Otsu);
-
-        // 5. Перевод пикселей в float[] (нормализация 0..1)
-        float[] pixels = new float[28 * 28];
-        
-        // Получаем доступ к байтам изображения (быстрый способ через индексатор для простоты)
-        for (int r = 0; r < 28; r++)
-        {
-            for (int c = 0; c < 28; c++)
-            {
-                // Получаем значение пикселя (0 или 255)
-                byte val = binary.At<byte>(r, c);
-                pixels[r * 28 + c] = val / 255.0f;
-            }
-        }
-
-        // 6. Распознавание
-        var image = new GreekSymbolImage(pixels);
-        var result = _currentClassifiers[_selectedModelIndex].Predict(image);
-        
-        PredictionResult = result.Symbol.ToString();
-        Confidence = result.Confidence * 100;
-        StatusInfo = "Распознано с камеры.";
-    }
-    catch (Exception ex)
-    {
-        StatusInfo = $"Ошибка обработки: {ex.Message}";
-    }
-}
+		{
+		    if (_latestFrame == null || _latestFrame.Empty()) 
+		    {
+		        StatusInfo = "Нет изображения с камеры.";
+		        return;
+		    }
+		    
+		    if (_currentClassifiers[_selectedModelIndex] == null)
+		    {
+		        PredictionResult = "Сеть не выбрана";
+		        return;
+		    }
+		
+		    try
+		    {
+		        var image = _photoProcessor.Process(_latestFrame);
+		        var result = _currentClassifiers[_selectedModelIndex].Predict(image);
+		        
+		        PredictionResult = result.Symbol.ToString();
+		        Confidence = result.Confidence * 100;
+		        StatusInfo = "Распознано с камеры.";
+		    }
+		    catch (Exception ex)
+		    {
+		        StatusInfo = $"Ошибка обработки: {ex.Message}";
+		    }
+		}
         
         private void StopCamera()
         {

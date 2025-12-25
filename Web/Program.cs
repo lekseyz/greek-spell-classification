@@ -1,4 +1,7 @@
-﻿using Telegram.Bot;
+﻿using DataProcessing;
+using Domain;
+using Domain.Models;
+using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
@@ -8,6 +11,7 @@ using Ml;
 
 BotService mlBot = new BotService();
 CustomNeuralNetwork greekPredictor = CustomNeuralNetwork.Load(Path.Combine(AppContext.BaseDirectory, "custom_model.json"));
+IPhotoProcessor photoProcessor = new PhotoProcessor();
 
 var token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
 if (string.IsNullOrWhiteSpace(token))
@@ -105,11 +109,17 @@ async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, Cancellation
             }
             
             var photoId = message.Photo!.Last().FileId;
-            var photo = message.Photo.First();
+			var tgFile = await bot.GetFile(photoId);
+			var stream = File.Create("../image.png");
+			await bot.DownloadFile(tgFile, stream);
+			GreekSymbolImage image = photoProcessor.Process(stream);
+			stream.Close();
+			
+			PredictionResult result = greekPredictor.Predict(image);
             
             await bot.SendMessage(
                 chatId: chatId,
-                text: $"ID фото: {photoId}",
+                text: mlBot.HandleImageRecognition(result.Symbol.ToString(), chatId),
                 cancellationToken: cancellationToken
             );
             break;

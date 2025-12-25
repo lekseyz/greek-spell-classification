@@ -11,14 +11,9 @@ namespace UI;
 // TODO: Maybe cool DI
 public static class ServiceLocator
 {
-	public static IDatasetGenerator DatasetGenerator { get; private set; }
-	private static IGreekClassifier _currentGreekClassifier;
-
-	public static void Initialize()
-	{
-		// Concrete realization of the dependency
-		DatasetGenerator = new DatasetProcessor();
-	}
+	public static IDatasetGenerator		DatasetGenerator	{ get; private set; } = new DatasetProcessor();
+	public static IPhotoProcessor		PhotoProcessor		{ get; private set; } = new PhotoProcessor();
+	private static	IGreekClassifier	_currentGreekClassifier;
 	
 	public static IGreekClassifier GetClassifier(NeuralNetworkConfig config, int modelIndex)
 	{
@@ -40,8 +35,6 @@ class Program
     [STAThread]
     public static void Main(string[] args)
 	{
-		ServiceLocator.Initialize();
-		
 		BuildAvaloniaApp()
 			.StartWithClassicDesktopLifetime(args);
 	}
