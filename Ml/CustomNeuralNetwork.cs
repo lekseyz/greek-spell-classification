@@ -26,11 +26,6 @@ public class CustomNeuralNetwork : IGreekClassifier
 	// --------------------------------------------------- Initialization ---------------------------------------------------
 	#region Initialization
 	
-    /// <summary>
-    /// Initializes a new instance of the <see cref="CustomNeuralNetwork"/> class based on the provided configuration.
-    /// </summary>
-    /// <param name="config">The configuration object defining the topology (input size, hidden layers, output classes).</param>
-    /// <exception cref="ArgumentException">Thrown when InputSize or OutputClasses are invalid (less than or equal to 0).</exception>
 	public CustomNeuralNetwork(NeuralNetworkConfig config)
 	{
 		if (config == null) 
@@ -52,11 +47,6 @@ public class CustomNeuralNetwork : IGreekClassifier
 		InitializeWeights();
 	}
 	
-	/// <summary>
-	/// Initializes the weights and biases for all layers in the neural network.
-	/// Uses Xavier (Glorot) initialization to set weight values within a range that prevents 
-	/// gradients from vanishing or exploding during training.
-	/// </summary>
 	private void InitializeWeights()
 	{
 		Random rnd = new Random(123); // Fixed seed for reproducibility
@@ -83,21 +73,12 @@ public class CustomNeuralNetwork : IGreekClassifier
 	}
 	#endregion
 
-	/// <summary>
-	/// Predicts the Greek letter based on the input image.
-	/// </summary>
-	/// <param name="image">The object containing the normalized pixel data of the symbol.</param>
-	/// <returns>A <see cref="PredictionResult"/> containing the predicted symbol and confidence level.</returns>
-	/// <exception cref="ArgumentNullException">Thrown if <paramref name="image"/> is null.</exception>
-	/// <exception cref="InvalidInputDataException">Thrown if the size of the image data does not match the configured network input size.</exception>
 	public PredictionResult Predict(GreekSymbolImage image)
 	{
 		if (image == null) throw new ArgumentNullException(nameof(image));
     
-		// Достаем пиксели из объекта
 		float[] pixelData = image.Pixels;
 
-		// Проверка совместимости размера сети и картинки
 		if (pixelData.Length != _layerSizes[0]) 
 			throw new InvalidInputDataException(_layerSizes[0], pixelData.Length);
 
@@ -129,11 +110,6 @@ public class CustomNeuralNetwork : IGreekClassifier
 		};
 	}
 	
-	/// <summary>
-	/// Tests the neural network using the provided dataset and returns the accuracy (percentage of correct predictions).
-	/// </summary>
-	/// <param name="dataset">A list of testing pairs.</param>
-	/// <returns>The accuracy of the model as a float (0.0 to 1.0).</returns>
 	public float Test(List<(GreekSymbolImage image, GreekLetter label)> dataset)
 	{
 		if (dataset == null || dataset.Count == 0) return 0.0f;
@@ -141,26 +117,22 @@ public class CustomNeuralNetwork : IGreekClassifier
 		int correctCount = 0;
 		int totalCount = dataset.Count;
 
-		// Использование существующего метода Predict для каждого образца
 		foreach (var sample in dataset)
 		{
-			// Predict уже выполняет предобработку (BinarizeInput)
 			PredictionResult prediction = Predict(sample.image);
             
-			// Проверка совпадения предсказанного символа с истинной меткой
 			if (prediction.Symbol == sample.label)
 			{
 				correctCount++;
 			}
 		}
 
-		// Расчет точности (правильные / общее)
 		return (float)correctCount / totalCount;
 	}
 	
 	private void Shuffle(List<(GreekSymbolImage image, GreekLetter label)> list)
 	{
-		Random rng = new Random(); // Можно вынести в поле класса
+		Random rng = new Random();
 		int n = list.Count;
 		while (n > 1)
 		{
@@ -172,14 +144,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 
 	// --------------------------------------------------- TRAINING ---------------------------------------------------
 	#region Training
-
-	/// <summary>
-	/// Trains the neural network using the provided dataset.
-	/// </summary>
-	/// <remarks>
-	/// This method uses Stochastic Gradient Descent (SGD) with Backpropagation.
-	/// </remarks>
-	/// <param name="dataset">A list of training pairs, where each pair consists of a <see cref="GreekSymbolImage"/> and its expected <see cref="GreekLetter"/> label.</param>
+	
 	public void Train(List<(GreekSymbolImage image, GreekLetter label)> dataset)
 	{
 		if (dataset == null || dataset.Count == 0) return;
@@ -259,7 +224,6 @@ public class CustomNeuralNetwork : IGreekClassifier
         float[] error = new float[_layerSizes.Last()];
 
         // 1. Calculate Output Error
-        // For Softmax + CrossEntropy, the derivative is simply (Output - Target)
         float[] outputLayer = activations.Last();
         for (int i = 0; i < error.Length; i++)
         {
@@ -276,23 +240,18 @@ public class CustomNeuralNetwork : IGreekClassifier
             int inputSize = _layerSizes[i];
             int outputSize = _layerSizes[i + 1];
 
-            // We need to calculate the error for the *previous* layer (to be used in the next iteration)
-            // BEFORE we update the weights of the *current* layer.
+            
             float[] prevError = new float[inputSize];
-            if (i > 0) // No need to calc error for input layer
+            if (i > 0)
             {
-                // Backpropagate error: prevError = (Weights * error) * Derivative(prevActivation)
-                // Parallelizing error propagation
                 Parallel.For(0, inputSize, row =>
                 {
                     float sum = 0;
                     for (int col = 0; col < outputSize; col++)
                     {
-                        // Transposed multiplication effectively
                         sum += currentWeights[row * outputSize + col] * error[col];
                     }
-                    // Multiply by derivative of Sigmoid: f'(x) = f(x) * (1 - f(x))
-                    // prevLayerActivation[row] holds the sigmoid output
+					
                     float val = prevLayerActivation[row];
                     //prevError[row] = sum * (val * (1.0f - val));
 					prevError[row] = sum * (1.0f - val * val);
@@ -330,9 +289,6 @@ public class CustomNeuralNetwork : IGreekClassifier
 	// --------------------------------------------------- SAVE/LOAD ---------------------------------------------------
 	#region SaveLoad
 
-	/// <summary>
-	/// Сохраняет текущее состояние сети в файл JSON.
-	/// </summary>
 	public void Save(string filePath)
 	{
 		var state = new NetworkState
@@ -347,9 +303,6 @@ public class CustomNeuralNetwork : IGreekClassifier
 		File.WriteAllText(filePath, json);
 	}
 
-	/// <summary>
-	/// Загружает сеть из файла JSON.
-	/// </summary>
 	public static CustomNeuralNetwork Load(string filePath)
 	{
 		if (!File.Exists(filePath)) 
@@ -361,11 +314,8 @@ public class CustomNeuralNetwork : IGreekClassifier
 		if (state == null || state.Config == null)
 			throw new Exception("Ошибка десериализации файла модели.");
 
-		// Создаем новую сеть на основе загруженного конфига
 		var network = new CustomNeuralNetwork(state.Config);
 
-		// Принудительно устанавливаем загруженные веса и смещения
-		// (очищаем те, что создались рандомно в конструкторе)
 		network._weights.Clear();
 		network._weights.AddRange(state.Weights);
 
@@ -387,16 +337,10 @@ public class CustomNeuralNetwork : IGreekClassifier
     {
         float[] result = new float[cols];
 
-        // The main computational load is here. Parallel.For is effective.
         Parallel.For(0, cols, j =>
         {
             float sum = 0;
-            // Linear memory access is cache-friendly if the matrix is stored row-major.
-            // However, since we iterate `j` (column) in the outer loop and `i` (row) in the inner loop,
-            // we are jumping through memory (weightsMatrix[i * cols + j]).
-            // For standard fully connected layers this is acceptable, but for very large matrices, 
-            // transposing the weight matrix upon initialization would accelerate this operation.
-            // Kept as-is for readability.
+           
             for (int i = 0; i < rows; i++)
             {
                 sum += inputVector[i] * weightsMatrix[i * cols + j];
@@ -410,7 +354,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 	private float[] OneHotEncode(GreekLetter label, int size)
 	{
 		float[] target = new float[size];
-		// Сдвигаем: Alpha(1)->0 ... Omega(24)->23
+		
 		int index = (int)label - 1; 
 
 		if (index >= 0 && index < size)
@@ -423,11 +367,10 @@ public class CustomNeuralNetwork : IGreekClassifier
 	private float CalculateCrossEntropyLoss(float[] predicted, float[] target)
 	{
 		float sum = 0;
-		// Small epsilon to avoid log(0)
+		
 		float epsilon = 1e-15f; 
 		for (int i = 0; i < predicted.Length; i++)
 		{
-			// Only the correct class contributes to Loss in One-Hot
 			if (target[i] > 0.5f) 
 			{
 				float val = Math.Max(predicted[i], epsilon);
@@ -437,26 +380,10 @@ public class CustomNeuralNetwork : IGreekClassifier
 		return sum;
 	}
 
-	/// <summary>
-	/// Computes the sigmoid activation function for a single scalar value.
-	/// Formula: f(x) = 1 / (1 + e^(-x)).
-	/// </summary>
-	/// <param name="x">The input value.</param>
-	/// <returns>A value between 0.0 and 1.0.</returns>
     private float Sigmoid(float x) => 1.0f / (1.0f + (float)Math.Exp(-x));
 	
-	/// <summary>
-	/// Computes the Hyperbolic Tangent (Tanh) activation function for a single scalar value.
-	/// Formula: f(x) = tanh(x). Output range is [-1.0, 1.0].
-	/// </summary>
 	private float Tanh(float x) => (float)Math.Tanh(x);
 
-	/// <summary>
-	/// Applies a specified activation function to every element of the input vector in parallel.
-	/// </summary>
-	/// <param name="vector">The input vector (e.g., the result of a matrix multiplication).</param>
-	/// <param name="activationFunc">The activation function delegate (e.g., Sigmoid).</param>
-	/// <returns>A new vector containing the activated values.</returns>
     private float[] ApplyActivation(float[] vector, Func<float, float> activationFunc)
     {
         float[] result = new float[vector.Length];
@@ -464,20 +391,12 @@ public class CustomNeuralNetwork : IGreekClassifier
         return result;
     }
 
-	/// <summary>
-	/// Computes the Softmax function for the input vector, converting raw scores (logits) into probabilities.
-	/// Subtracts the maximum value from elements before exponentiation to improve numerical stability.
-	/// </summary>
-	/// <param name="vector">The input vector of logits (raw predictions).</param>
-	/// <returns>A probability distribution vector where all elements sum to 1.0.</returns>
     private float[] Softmax(float[] vector)
     {
         float max = vector.Max();
         float[] exps = new float[vector.Length];
         float sum = 0;
 
-        // Parallelization is risky here due to summation (race condition),
-        // and the data volume (e.g., 25 classes) is too small to justify complex locking.
         for (int i = 0; i < vector.Length; i++)
         {
             exps[i] = (float)Math.Exp(vector[i] - max);
@@ -491,11 +410,6 @@ public class CustomNeuralNetwork : IGreekClassifier
         return exps;
     }
 
-	/// <summary>
-	/// Finds the index of the element with the maximum value in the array.
-	/// </summary>
-	/// <param name="vector">The array of float values (typically probabilities).</param>
-	/// <returns>The zero-based index of the maximum value.</returns>
     private int ArgMax(float[] vector)
     {
         int maxIndex = 0;

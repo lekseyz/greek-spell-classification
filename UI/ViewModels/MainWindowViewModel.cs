@@ -184,7 +184,7 @@ namespace UI.ViewModels
                     {
                         // 1. Загружаем сеть
                         var loadedNet = CustomNeuralNetwork.Load(path);
-                        _currentClassifiers[1] = loadedNet;
+                        _currentClassifiers[0] = loadedNet;
 
                         // 2. Обновляем DTO и свойства VM для синхронизации UI
                         var loadedConfig = loadedNet.Config;

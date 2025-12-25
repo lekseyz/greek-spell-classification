@@ -8,8 +8,20 @@ using Microsoft.ML.Trainers;
 using Domain;
 using Domain.Exceptions;
 using Domain.Models;
+using Microsoft.ML.Trainers.LightGbm;
+using Microsoft.ML.Vision;
 
 namespace Ml;
+
+public class FloatInput
+{
+	public float[] PixelFeatures { get; set; }
+}
+	
+public class ByteOutput
+{
+	public byte[] ByteFeatures { get; set; }
+}
 
 public class MlNetGreekClassifier : IGreekClassifier
 {
@@ -49,29 +61,29 @@ public class MlNetGreekClassifier : IGreekClassifier
 
         Console.WriteLine("Подготовка данных и центрирование изображений...");
 
-        // 1. Преобразуем данные и ЦЕНТРИРУЕМ их на лету
         var trainingData = dataset.Select(d => new InputData
         {
-            Pixels = CenterImage(d.image.Pixels), // <--- МАГИЯ ЗДЕСЬ
+            Pixels = CenterImage(d.image.Pixels), 
             Label = (uint)d.label
         });
 
         IDataView dataView = _mlContext.Data.LoadFromEnumerable(trainingData);
 
-        // 2. Настройка пайплайна
-        // Используем LbfgsMaximumEntropy - он точнее чем SDCA для таких задач
-        var pipeline = _mlContext.Transforms.Conversion.MapValueToKey(outputColumnName: "LabelKey", inputColumnName: "Label")
-            .Append(_mlContext.MulticlassClassification.Trainers.LbfgsMaximumEntropy(
-                labelColumnName: "LabelKey", 
-                featureColumnName: "PixelFeatures",
-                l1Regularization: 0.03f, // Немного убираем шум
-                l2Regularization: 0.03f,
-                historySize: 50,    // Память для оптимизатора
-                optimizationTolerance: 1e-5f // Требуем высокой точности
-                ))
-            .Append(_mlContext.Transforms.Conversion.MapKeyToValue(outputColumnName: "PredictedLabelValue", inputColumnName: "PredictedLabel"));
+		var pipeline = _mlContext.Transforms.Conversion.MapValueToKey("LabelKey", "Label")
+								 .Append(_mlContext.MulticlassClassification.Trainers.LightGbm(
+									 new LightGbmMulticlassTrainer.Options
+									 {
+										 LabelColumnName = "LabelKey",
+										 FeatureColumnName = "PixelFeatures",
+            
+										 NumberOfIterations = 2000, 
+            
+										 LearningRate = 0.05f, 
+            
+										 NumberOfLeaves = 100 
+									 }))
+								 .Append(_mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabelValue", "PredictedLabel"));
 
-        // 3. Запуск обучения
         Console.WriteLine("Запуск обучения модели (L-BFGS)");
         _trainedModel = pipeline.Fit(dataView);
         Console.WriteLine("Обучение завершено!");
@@ -89,7 +101,6 @@ public class MlNetGreekClassifier : IGreekClassifier
             _predictionEngine = _mlContext.Model.CreatePredictionEngine<InputData, OutputData>(_trainedModel);
         }
 
-        // Обязательно центрируем и входное изображение перед предсказанием!
         var centeredPixels = CenterImage(image.Pixels);
         var input = new InputData { Pixels = centeredPixels };
         
@@ -108,7 +119,6 @@ public class MlNetGreekClassifier : IGreekClassifier
     {
         if (_trainedModel == null) return 0.0f;
 
-        // Тестовые данные тоже центрируем
         var testData = dataset.Select(d => new InputData
         {
             Pixels = CenterImage(d.image.Pixels),
@@ -122,19 +132,16 @@ public class MlNetGreekClassifier : IGreekClassifier
         return (float)metrics.MacroAccuracy;
     }
 
-    // ------------------------------------------------------------------------------------
-    // Логика центрирования (перенесена сюда, чтобы ничего не ломать в DatasetProcessor)
-    // ------------------------------------------------------------------------------------
     private float[] CenterImage(float[] source)
-    {
-        // 1. Находим границы символа
+	{
+		return source;
         int minX = W, minY = H, maxX = -1, maxY = -1;
 
         for (int y = 0; y < H; y++)
         {
             for (int x = 0; x < W; x++)
             {
-                if (source[y * W + x] > 0.1f) // Если пиксель не черный
+                if (source[y * W + x] > 0.1f) 
                 {
                     if (x < minX) minX = x;
                     if (x > maxX) maxX = x;
@@ -144,10 +151,8 @@ public class MlNetGreekClassifier : IGreekClassifier
             }
         }
 
-        // Если пустая картинка, возвращаем как есть
         if (maxX == -1) return source;
 
-        // 2. Вычисляем смещение к центру
         int width = maxX - minX + 1;
         int height = maxY - minY + 1;
         
@@ -162,13 +167,11 @@ public class MlNetGreekClassifier : IGreekClassifier
 
         if (dx == 0 && dy == 0) return source;
 
-        // 3. Применяем смещение
         float[] shifted = new float[Size];
         for (int y = 0; y < H; y++)
         {
             for (int x = 0; x < W; x++)
             {
-                // Координаты откуда берем пиксель
                 int oldX = x - dx;
                 int oldY = y - dy;
 
