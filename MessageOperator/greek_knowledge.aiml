@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<aiml>
+  <category>
+    <pattern>ЧТО ТЫ УМЕЕШЬ</pattern>
+    <template>Я знаю весь греческий алфавит: от Альфы до Омеги. Назови любую букву (например, "Расскажи о Сигме" или просто "Дельта"), и я поделюсь информацией.</template>
+  </category>
+
+  <category>
+    <pattern>РАССКАЖИ О АЛЬФЕ</pattern>
+    <template>
+      <think><set name="current_topic">alpha</set></think>
+      Альфа (Α, α) — первая буква греческого алфавита. В системе греческой записи чисел соответствует единице.
+    </template>
+  </category>
+  <category><pattern>АЛЬФА</pattern><template><srai>РАССКАЖИ О АЛЬФЕ</srai></template></category>
+  <category><pattern>ЧТО ТАКОЕ АЛЬФА</pattern><template><srai>РАССКАЖИ О АЛЬФЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О БЕТЕ</pattern>
+    <template>
+      <think><set name="current_topic">beta</set></think>
+      Бета (Β, β) — вторая буква. В древнегреческом произносилась как [b], а в современном — как [v] (Вита).
+    </template>
+  </category>
+  <category><pattern>БЕТА</pattern><template><srai>РАССКАЖИ О БЕТЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ГАММЕ</pattern>
+    <template>
+      <think><set name="current_topic">gamma</set></think>
+      Гамма (Γ, γ) — третья буква. Часто используется в физике и математике для обозначения углов и коэффициентов.
+    </template>
+  </category>
+  <category><pattern>ГАММА</pattern><template><srai>РАССКАЖИ О ГАММЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ДЕЛЬТЕ</pattern>
+    <template>
+      <think><set name="current_topic">delta</set></think>
+      Дельта (Δ, δ) — четвертая буква. Заглавная буква имеет форму треугольника.
+    </template>
+  </category>
+  <category><pattern>ДЕЛЬТА</pattern><template><srai>РАССКАЖИ О ДЕЛЬТЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ ОБ ЭПСИЛОН</pattern>
+    <template>
+      <think><set name="current_topic">epsilon</set></think>
+      Эпсилон (Ε, ε) — пятая буква. В математическом анализе обозначает сколь угодно малую положительную величину.
+    </template>
+  </category>
+  <category><pattern>ЭПСИЛОН</pattern><template><srai>РАССКАЖИ ОБ ЭПСИЛОН</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ДЗЕТЕ</pattern>
+    <template>
+      <think><set name="current_topic">zeta</set></think>
+      Дзета (Ζ, ζ) — шестая буква. В математике часто используется как обозначение дзета-функции Римана.
+    </template>
+  </category>
+  <category><pattern>ДЗЕТА</pattern><template><srai>РАССКАЖИ О ДЗЕТЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ ОБ ЭТЕ</pattern>
+    <template>
+      <think><set name="current_topic">eta</set></think>
+      Эта (Η, η) — седьмая буква. В физике часто обозначает коэффициент полезного действия (КПД).
+    </template>
+  </category>
+  <category><pattern>ЭТА</pattern><template><srai>РАССКАЖИ ОБ ЭТЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ТЕТЕ</pattern>
+    <template>
+      <think><set name="current_topic">theta</set></think>
+      Тета (Θ, θ) — восьмая буква. Традиционно используется для обозначения неизвестного угла в геометрии.
+    </template>
+  </category>
+  <category><pattern>ТЕТА</pattern><template><srai>РАССКАЖИ О ТЕТЕ</srai></template></category>
+  <category><pattern>ФИТА</pattern><template><srai>РАССКАЖИ О ТЕТЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ЙОТЕ</pattern>
+    <template>
+      <think><set name="current_topic">iota</set></think>
+      Йота (Ι, ι) — девятая буква. Это самая маленькая буква в греческом алфавите (откуда пошло выражение "ни на йоту").
+    </template>
+  </category>
+  <category><pattern>ЙОТА</pattern><template><srai>РАССКАЖИ О ЙОТЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О КАППЕ</pattern>
+    <template>
+      <think><set name="current_topic">kappa</set></think>
+      Каппа (Κ, κ) — десятая буква. В дифференциальной геометрии обозначает кривизну кривой.
+    </template>
+  </category>
+  <category><pattern>КАППА</pattern><template><srai>РАССКАЖИ О КАППЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ЛЯМБДЕ</pattern>
+    <template>
+      <think><set name="current_topic">lambda</set></think>
+      Лямбда (Λ, λ) — одиннадцатая буква. В физике строчная буква обозначает длину волны.
+    </template>
+  </category>
+  <category><pattern>ЛЯМБДА</pattern><template><srai>РАССКАЖИ О ЛЯМБДЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О МЮ</pattern>
+    <template>
+      <think><set name="current_topic">mu</set></think>
+      Мю (Μ, μ) — двенадцатая буква. В системе СИ используется как приставка "микро-" (одна миллионная).
+    </template>
+  </category>
+  <category><pattern>МЮ</pattern><template><srai>РАССКАЖИ О МЮ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О НЮ</pattern>
+    <template>
+      <think><set name="current_topic">nu</set></think>
+      Ню (Ν, ν) — тринадцатая буква. В физике часто обозначает частоту волны (наряду с буквой f).
+    </template>
+  </category>
+  <category><pattern>НЮ</pattern><template><srai>РАССКАЖИ О НЮ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О КСИ</pattern>
+    <template>
+      <think><set name="current_topic">xi</set></think>
+      Кси (Ξ, ξ) — четырнадцатая буква. В термодинамике может обозначать термодинамический потенциал.
+    </template>
+  </category>
+  <category><pattern>КСИ</pattern><template><srai>РАССКАЖИ О КСИ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ ОБ ОМИКРОНЕ</pattern>
+    <template>
+      <think><set name="current_topic">omicron</set></think>
+      Омикрон (Ο, ο) — пятнадцатая буква. Название буквально переводится как «малое О» (в отличие от «большого» — Омеги).
+    </template>
+  </category>
+  <category><pattern>ОМИКРОН</pattern><template><srai>РАССКАЖИ ОБ ОМИКРОНЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ПИ</pattern>
+    <template>
+      <think><set name="current_topic">pi</set></think>
+      Пи (Π, π) — шестнадцатая буква. Самая известная математическая константа, равная отношению длины окружности к диаметру.
+    </template>
+  </category>
+  <category><pattern>ПИ</pattern><template><srai>РАССКАЖИ О ПИ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О РО</pattern>
+    <template>
+      <think><set name="current_topic">rho</set></think>
+      Ро (Ρ, ρ) — семнадцатая буква. В физике обычно обозначает плотность вещества или удельное электрическое сопротивление.
+    </template>
+  </category>
+  <category><pattern>РО</pattern><template><srai>РАССКАЖИ О РО</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О СИГМЕ</pattern>
+    <template>
+      <think><set name="current_topic">sigma</set></think>
+      Сигма (Σ, σ, ς) — восемнадцатая буква. Заглавная Σ используется в математике для обозначения суммы.
+    </template>
+  </category>
+  <category><pattern>СИГМА</pattern><template><srai>РАССКАЖИ О СИГМЕ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ТАУ</pattern>
+    <template>
+      <think><set name="current_topic">tau</set></think>
+      Тау (Τ, τ) — девятнадцатая буква. В механике обозначает крутящий момент или касательное напряжение.
+    </template>
+  </category>
+  <category><pattern>ТАУ</pattern><template><srai>РАССКАЖИ О ТАУ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ ОБ ИПСИЛОН</pattern>
+    <template>
+      <think><set name="current_topic">upsilon</set></think>
+      Ипсилон (Υ, υ) — двадцатая буква. В физике частиц существует ипсилон-мезон.
+    </template>
+  </category>
+  <category><pattern>ИПСИЛОН</pattern><template><srai>РАССКАЖИ ОБ ИПСИЛОН</srai></template></category>
+  <category><pattern>УПСИЛОН</pattern><template><srai>РАССКАЖИ ОБ ИПСИЛОН</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ФИ</pattern>
+    <template>
+      <think><set name="current_topic">phi</set></think>
+      Фи (Φ, φ) — двадцать первая буква. Часто обозначает «золотое сечение» (примерно 1.618) в искусстве и архитектуре.
+    </template>
+  </category>
+  <category><pattern>ФИ</pattern><template><srai>РАССКАЖИ О ФИ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ХИ</pattern>
+    <template>
+      <think><set name="current_topic">chi</set></think>
+      Хи (Χ, χ) — двадцать вторая буква. В статистике широко известно распределение хи-квадрат.
+    </template>
+  </category>
+  <category><pattern>ХИ</pattern><template><srai>РАССКАЖИ О ХИ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ О ПСИ</pattern>
+    <template>
+      <think><set name="current_topic">psi</set></think>
+      Пси (Ψ, ψ) — двадцать третья буква. Является международным символом психологии.
+    </template>
+  </category>
+  <category><pattern>ПСИ</pattern><template><srai>РАССКАЖИ О ПСИ</srai></template></category>
+
+  <category>
+    <pattern>РАССКАЖИ ОБ ОМЕГЕ</pattern>
+    <template>
+      <think><set name="current_topic">omega</set></think>
+      Омега (Ω, ω) — последняя, двадцать четвертая буква. Заглавная буква — символ единицы электрического сопротивления (Ом).
+    </template>
+  </category>
+  <category><pattern>ОМЕГА</pattern><template><srai>РАССКАЖИ ОБ ОМЕГЕ</srai></template></category>
+
+</aiml>

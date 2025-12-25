@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<aiml>
+  <category>
+    <pattern>ПРИВЕТ</pattern>
+    <template>
+      <condition name="user-name">
+        <li value="unknown">Привет! Я нейросеть для распознавания греческих символов. Как тебя зовут?</li>
+        <li>Здравствуй, <get name="user-name"/>! Рад снова тебя видеть. О какой букве поговорим?</li>
+      </condition>
+    </template>
+  </category>
+
+  <category>
+    <pattern>ЗДРАВСТВУЙТЕ</pattern>
+    <template><srai>ПРИВЕТ</srai></template>
+  </category>
+
+  <category>
+    <pattern>МЕНЯ ЗОВУТ *</pattern>
+    <template>
+      <think><set name="user-name"><star/></set></think>
+      Приятно познакомиться, <get name="user-name"/>. Теперь я буду знать, как к тебе обращаться.
+    </template>
+  </category>
+
+  <category>
+    <pattern>МОЕ ИМЯ *</pattern>
+    <template><srai>МЕНЯ ЗОВУТ <star/></srai></template>
+  </category>
+
+  <category>
+    <pattern>Я *</pattern>
+    <template>
+      <srai>МЕНЯ ЗОВУТ <star/></srai>
+    </template>
+  </category>
+
+  <category>
+    <pattern>КТО Я</pattern>
+    <template>
+      <condition name="user-name">
+        <li value="unknown">Я пока не знаю твоего имени. Представься, пожалуйста.</li>
+        <li>Ты <get name="user-name"/>.</li>
+      </condition>
+    </template>
+  </category>
+</aiml>
