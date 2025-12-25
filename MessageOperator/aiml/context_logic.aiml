@@ -105,4 +105,12 @@
     <template><srai>О ЧЕМ МЫ</srai></template>
   </category>
 
+  <category>
+  <pattern>RECOGNIZED *</pattern>
+  <template>
+    <think><set name="current_topic"><star/></set></think>
+    Я вижу образ: <star/>. Хочешь расскажу о нем подробнее?
+  </template>
+</category>
+
 </aiml>

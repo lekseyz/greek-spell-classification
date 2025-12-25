@@ -11,4 +11,13 @@
       <PackageReference Include="AIMLBot" Version="2.0.0" />
     </ItemGroup>
 
+    <ItemGroup>
+        <None Update="config\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="aiml\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
 </Project>
