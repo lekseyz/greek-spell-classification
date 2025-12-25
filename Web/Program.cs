@@ -3,6 +3,11 @@ using Telegram.Bot.Exceptions;
 using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using MessageOperator;
+using Ml;
+
+BotService mlBot = new BotService();
+CustomNeuralNetwork greekPredictor = CustomNeuralNetwork.Load(Path.Combine(AppContext.BaseDirectory, "custom_model.json"));
 
 var token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
 if (string.IsNullOrWhiteSpace(token))
@@ -41,16 +46,67 @@ async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, Cancellation
     switch (message.Type)
     {
         case MessageType.Text:
+            var messageText = message.Text;
+            if (string.IsNullOrEmpty(messageText))
+            {
+                await bot.SendMessage(
+                    chatId: chatId,
+                    text: $"Пиши нормально!!!",
+                    cancellationToken: cancellationToken
+                );
+                return;
+            }
+            
+            if (messageText.StartsWith("/"))
+            {
+                switch (messageText)
+                {
+                    case "/start":
+                        mlBot.AddUser(chatId);
+                        await bot.SendMessage(
+                            chatId: chatId,
+                            text: $"Начат новый чат",
+                            cancellationToken: cancellationToken
+                        );
+                        return;
+                    case "/help":
+                        await bot.SendMessage(
+                            chatId: chatId,
+                            text: "С ботом ты можешь просто дружески пообщаться или прислать твою любимую букву греческого алфавита и бот ответит что это за буква. \nЧтоб очистить/начать заново чат используй команду /start",
+                            cancellationToken: cancellationToken
+                        );
+                        return;
+                    default:
+                        await bot.SendMessage(
+                            chatId: chatId,
+                            text: "Команда не распознана. \nЧтоб получить справку по использованию бота используй команду /help",
+                            cancellationToken: cancellationToken
+                        );
+                        return;
+                }
+            }
+            
             await bot.SendMessage(
                 chatId: chatId,
-                text: $"Эхо: {message.Text}",
+                text: mlBot.Talk(messageText, chatId),
                 cancellationToken: cancellationToken
             );
             break;
 
         case MessageType.Photo:
+            if (message.Photo is null)
+            {
+                await bot.SendMessage(
+                    chatId: chatId,
+                    text: "Нормальные фотки кидай!!!",
+                    cancellationToken: cancellationToken
+                );
+                return;
+            }
+            
             var photoId = message.Photo!.Last().FileId;
-
+            var photo = message.Photo.First();
+            
             await bot.SendMessage(
                 chatId: chatId,
                 text: $"ID фото: {photoId}",
