@@ -4,14 +4,13 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-/*var token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
+var token = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
 if (string.IsNullOrWhiteSpace(token))
 {
     Console.WriteLine("ОШИБКА: Токен не найден! (Проверьте переменные окружения)");
     return;
-}*/
-
-var botClient = new TelegramBotClient("8483840427:AAEkDox_niCsZ-8qV4CmzUW39s6VIP7oxn4");
+}
+var botClient = new TelegramBotClient(token);
 using CancellationTokenSource cts = new();
 
 ReceiverOptions receiverOptions = new()
