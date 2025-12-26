@@ -128,7 +128,7 @@
                     
                     <StackPanel Spacing="8" 
                         Classes="conditional-box" 
-                        IsEnabled="{Binding IsMlpSettingsEnabled}">
+                        IsEnabled="{Binding IsCustomSettingsEnabled}">
 
                         <TextBlock Text="Настройки MLP" 
                                    Classes="text-primary" 

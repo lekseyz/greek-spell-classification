@@ -24,7 +24,7 @@ using CancellationTokenSource cts = new();
 
 ReceiverOptions receiverOptions = new()
 {
-    AllowedUpdates = Array.Empty<UpdateType>()
+    AllowedUpdates = []
 };
 
 botClient.StartReceiving(
@@ -61,7 +61,7 @@ async Task HandleUpdateAsync(ITelegramBotClient bot, Update update, Cancellation
                 return;
             }
             
-            if (messageText.StartsWith("/"))
+            if (messageText.StartsWith('/'))
             {
                 switch (messageText)
                 {

@@ -8,6 +8,7 @@ namespace MessageOperator;
 public class BotService
 {
 	private readonly Bot _bot;
+	
 	private Dictionary<long, User> _users;
 
 	public BotService()
@@ -50,10 +51,8 @@ public class BotService
 		return result.Output;
 	}
     
-	// Метод для связи с нейросетью (вызовите его, когда распознаете фото)
 	public string HandleImageRecognition(string letterName, long userId)
 	{
-		// "RECOGNIZED" — это ключевое слово, которое мы добавили в AIML
 		return Talk($"RECOGNIZED {letterName.ToLower()}", userId);
 	}
 }

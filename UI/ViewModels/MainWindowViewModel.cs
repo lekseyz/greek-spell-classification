@@ -21,8 +21,6 @@ using Avalonia.Media.Imaging;
 
 namespace UI.ViewModels
 {
-    // 1. Вспомогательный класс-обертка для одного слоя
-    // Нужен, чтобы мы могли менять число нейронов в UI, и интерфейс об этом узнавал
     public class HiddenLayerVm : ReactiveObject
     {
         private int _neurons;
@@ -35,49 +33,44 @@ namespace UI.ViewModels
         public HiddenLayerVm(int neurons) => Neurons = neurons;
     }
 
-    public enum Classifiers
-    {
-        Custom = 0,
-        NetMl = 1
-    }
-
     public class MainWindowViewModel : ViewModelBase
     {
+		private const int	DrawWidth		= GreekSymbolConstants.ImageWidth;
+		private const int	DrawHeight		= GreekSymbolConstants.ImageHeight;
+		private const float CameraDeltaTime = 1/30f;
+		private const uint	BlackUInt		= 0xFF000000;
+		private const uint	WhiteUInt		= 0xFFFFFFFF;
+		
+		private readonly Vector _canvasDpi = new Vector(96, 96);
+		
 		private readonly	IDatasetGenerator		_datasetGenerator;
 		private				List<IGreekClassifier>	_currentClassifiers;
 		private				IPhotoProcessor			_photoProcessor;
-        private Classifiers _currentClassifier;
 		
-        // Хранилище данных (DTO)
+        // DTO
         private NeuralNetworkConfigDto _config = new NeuralNetworkConfigDto();
 
-        // Поля для UI (стандартные)
+        // UI
         private Bitmap? _cameraFeed;
-        private string _predictionResult = "Ожидание...";
-        private double _confidence = 0;
-        private string _statusInfo = "Система готова";
-        private int _selectedModelIndex = 0;
+        private string 	_predictionResult = "Ожидание...";
+        private double 	_confidence = 0;
+        private string 	_statusInfo = "Система готова";
+        private int		_selectedModelIndex = 0;
         
-        // --- Камера ---
-        private VideoCapture? _capture;
-        private CancellationTokenSource? _cameraCts;
-        
+        // Camera
+        private VideoCapture?				_capture;
+        private CancellationTokenSource?	_cameraCts;
+		private DispatcherTimer				_cameraTimer;
+		private Mat?						_latestFrame; 
 		
-		// --- Рисовалка ---
-		private bool _isDrawingMode;
+		// Draw
+		private bool			_isDrawingMode;
 		private WriteableBitmap _drawingBitmap;
-        
-        // --- Добавить в поля класса ---
-        private DispatcherTimer _cameraTimer;
-        private Mat? _latestFrame; // Хранит последний кадр для обработки
 		
-		private const int DrawWidth = GreekSymbolConstants.ImageWidth;
-		private const int DrawHeight =  GreekSymbolConstants.ImageHeight;
-
-        // --- Коллекция слоев для UI ---
+        // Layers
         public ObservableCollection<HiddenLayerVm> EditableHiddenLayers { get; } = new();
 
-        // --- Команды ---
+        // Commands
         public ReactiveCommand<Unit, Unit> CaptureCommand { get; }
         public ReactiveCommand<Unit, Unit> AddLayerCommand { get; }
         public ReactiveCommand<Unit, Unit> RemoveLayerCommand { get; }
@@ -86,41 +79,152 @@ namespace UI.ViewModels
 		public ReactiveCommand<Unit, Unit> TestNetworkCommand { get; }
 		public ReactiveCommand<Unit, Unit> SaveNetworkCommand { get; }
 		public ReactiveCommand<Unit, Unit> LoadNetworkCommand { get; }
-		
 		public ReactiveCommand<Unit, Unit> ToggleSourceCommand { get; }
 		public ReactiveCommand<Unit, Unit> ClearDrawingCommand { get; }
         public ReactiveCommand<Unit, Unit> ClassifyCameraCommand { get; }
+
+		// -------------------------------------- PropertiesUI --------------------------------------
+		#region PropertiesUI
+
+		public bool IsDrawingMode
+		{
+			get => _isDrawingMode;
+			set => this.RaiseAndSetIfChanged(ref _isDrawingMode, value);
+		}
+
+		public WriteableBitmap DrawingBitmap
+		{
+			get => _drawingBitmap;
+			set => this.RaiseAndSetIfChanged(ref _drawingBitmap, value);
+		}
+		
+		public int SelectedModelIndex
+		{
+			get => _selectedModelIndex;
+			set
+			{
+				this.RaiseAndSetIfChanged(ref _selectedModelIndex, value);
+				this.RaisePropertyChanged(nameof(IsCustomSettingsEnabled));
+			}
+		}
+
+		public bool IsCustomSettingsEnabled => SelectedModelIndex == 0;
         
+		public Bitmap? CameraFeed
+		{
+			get => _cameraFeed;
+			set => this.RaiseAndSetIfChanged(ref _cameraFeed, value);
+		}
+
+		public string PredictionResult
+		{
+			get => _predictionResult;
+			set => this.RaiseAndSetIfChanged(ref _predictionResult, value);
+		}
+
+		public double Confidence
+		{
+			get => _confidence;
+			set => this.RaiseAndSetIfChanged(ref _confidence, value);
+		}
+
+		public string StatusInfo
+		{
+			get => _statusInfo;
+			set => this.RaiseAndSetIfChanged(ref _statusInfo, value);
+		}
+
+		#endregion
+		
+		// -------------------------------------- PropertiesConfig --------------------------------------
+		#region PropertiesConfig
+		public int InputSize
+		{
+			get => _config.InputSize;
+			set
+			{
+				_config.InputSize = value;
+				this.RaisePropertyChanged(); 
+			}
+		}
+
+		public int TrainingSampleSize
+		{
+			get => _config.TrainingSampleSize;
+			set
+			{
+				_config.TrainingSampleSize = value;
+				this.RaisePropertyChanged();
+			}
+		}
+
+		public int Epochs
+		{
+			get => _config.Epochs;
+			set
+			{
+				_config.Epochs = value;
+				this.RaisePropertyChanged();
+			}
+		}
+		
+		public decimal AcceptableErrorUi
+		{
+			get => (decimal)_config.AcceptableError;
+			set
+			{
+				_config.AcceptableError = (float)value;
+				this.RaisePropertyChanged();
+			}
+		}
+
+		public decimal LearningRateUi
+		{
+			get => (decimal)_config.LearningRate;
+			set
+			{
+				_config.LearningRate = (float)value;
+				this.RaisePropertyChanged();
+			}
+		}
+		#endregion
+		
         public MainWindowViewModel()
         {
-			_datasetGenerator = ServiceLocator.DatasetGenerator;
-			_photoProcessor = ServiceLocator.PhotoProcessor;
-			_drawingBitmap = new WriteableBitmap(new PixelSize(DrawWidth, DrawHeight), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
-            _currentClassifiers = new List<IGreekClassifier> { null, new MlNetGreekClassifier() };
+			_datasetGenerator	= ServiceLocator.DatasetGenerator;
+			_photoProcessor		= ServiceLocator.PhotoProcessor;
+			_drawingBitmap		= new WriteableBitmap(new PixelSize(DrawWidth, DrawHeight), _canvasDpi, PixelFormat.Bgra8888, AlphaFormat.Opaque);
+            _currentClassifiers = [new CustomNeuralNetwork(new NeuralNetworkConfig()), new MlNetGreekClassifier()];
             ClearDrawing();
             
-            _cameraTimer = new DispatcherTimer();
-            _cameraTimer.Interval = TimeSpan.FromMilliseconds(33); // ~30 FPS
-            _cameraTimer.Tick += CameraTimer_Tick;
+            _cameraTimer			= new DispatcherTimer();
+            _cameraTimer.Interval	= TimeSpan.FromMilliseconds(CameraDeltaTime); 
+            _cameraTimer.Tick		+= CameraTimer_Tick;
 			
+			foreach (var neurons in _config.HiddenLayerNeurons)
+			{
+				EditableHiddenLayers.Add(new HiddenLayerVm(neurons));
+			}
+			
+			// -------------------------------------- Camera/Drawing --------------------------------------
+			#region Camera/Drawing
             ToggleSourceCommand = ReactiveCommand.Create(() =>
             {
                 IsDrawingMode = !IsDrawingMode;
     
                 if (IsDrawingMode)
                 {
-                    StopCamera(); // Выключаем камеру
+                    StopCamera();
                     StatusInfo = "Режим рисования включен.";
                     ClassifyDrawing();
                 }
                 else
                 {
-                    StartCamera(); // Включаем камеру
+                    StartCamera();
                     StatusInfo = "Режим камеры включен.";
                 }
             });
 
-			// --- Команда очистки холста ---
             ClassifyCameraCommand = ReactiveCommand.Create(ClassifyCameraImage);
 			ClearDrawingCommand = ReactiveCommand.Create(() =>
 			{
@@ -128,10 +232,13 @@ namespace UI.ViewModels
 				ClassifyDrawing();
 				StatusInfo = "Холст очищен.";
 			});
+			#endregion
 			
+			// -------------------------------------- Save/Load --------------------------------------
+			#region SaveLoad
 			SaveNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
-                if (!IsMlpSettingsEnabled)
+                if (!IsCustomSettingsEnabled)
                 {
                     StatusInfo = "Ошибка: Для сохранения выберите 'Самописная (MLP)'.";
                     return;
@@ -139,8 +246,6 @@ namespace UI.ViewModels
 
                 if (_currentClassifiers[_selectedModelIndex] is CustomNeuralNetwork customNet)
                 {
-                    // Для простоты сохраняем в папку приложения. 
-                    // Можно заменить на SaveFileDialog.
                     string path = Path.Combine(AppContext.BaseDirectory, "custom_model.json");
                     
                     await Task.Run(() => 
@@ -162,10 +267,9 @@ namespace UI.ViewModels
                 }
             });
             
-            // --- Реализация команды загрузки ---
             LoadNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
-                if (!IsMlpSettingsEnabled)
+                if (!IsCustomSettingsEnabled)
                 {
                     StatusInfo = "Ошибка: Переключитесь на 'Самописная (MLP)' перед загрузкой.";
                     return;
@@ -184,22 +288,17 @@ namespace UI.ViewModels
                 {
                     try
                     {
-                        // 1. Загружаем сеть
                         var loadedNet = CustomNeuralNetwork.Load(path);
                         _currentClassifiers[0] = loadedNet;
 
-                        // 2. Обновляем DTO и свойства VM для синхронизации UI
                         var loadedConfig = loadedNet.Config;
-
-                        // Обновляем простые свойства (Dispatcher не обязателен, т.к. ReactiveUI handle property changes)
-                        // Но если возникнут проблемы с потоками, оберните в Dispatcher.UIThread.InvokeAsync
                         InputSize = loadedConfig.InputSize;
                         Epochs = loadedConfig.Epochs;
                         TrainingSampleSize = loadedConfig.TrainingSampleSize;
                         LearningRateUi = (decimal)loadedConfig.LearningRate;
                         AcceptableErrorUi = (decimal)loadedConfig.AcceptableError;
 
-                        // Обновляем коллекцию слоев (нужно делать в UI потоке для надежности, или использовать BindingOperations.EnableCollectionSynchronization)
+						// Update layers UI
                         Avalonia.Threading.Dispatcher.UIThread.Invoke(() =>
                         {
                             EditableHiddenLayers.Clear();
@@ -207,7 +306,7 @@ namespace UI.ViewModels
                             {
                                 EditableHiddenLayers.Add(new HiddenLayerVm(neurons));
                             }
-                            // Синхронизируем внутренний DTO с UI
+							
                             SyncLayersToDto();
                         });
 
@@ -219,24 +318,16 @@ namespace UI.ViewModels
                     }
                 });
             });
-			
-            // Инициализация слоев из конфига (если там что-то есть по умолчанию)
-            if (_config.HiddenLayerNeurons != null)
-            {
-                foreach (var neurons in _config.HiddenLayerNeurons)
-                {
-                    EditableHiddenLayers.Add(new HiddenLayerVm(neurons));
-                }
-            }
+			#endregion
 
-            // Команда: Добавить слой (по умолчанию 64 нейрона)
+			// -------------------------------------- LayerConfig --------------------------------------
+			#region LayerConfig
             AddLayerCommand = ReactiveCommand.Create(() =>
             {
                 EditableHiddenLayers.Add(new HiddenLayerVm(64));
                 SyncLayersToDto(); // Обновляем DTO
             });
 
-            // Команда: Удалить последний слой
             RemoveLayerCommand = ReactiveCommand.Create(() =>
             {
                 if (EditableHiddenLayers.Count > 0)
@@ -245,40 +336,38 @@ namespace UI.ViewModels
                     SyncLayersToDto();
                 }
             });
+			#endregion
 
-            // Команда: Захват изображения
+			// -------------------------------------- Dataset --------------------------------------
+			#region Dataset
             CaptureCommand = ReactiveCommand.Create(() => 
             {
+				// TODO: 
                 StatusInfo = "Изображение захвачено и добавлено в обучение!";
-                // Тут будет логика сохранения кадра
             });
 			
 			GenerateDatasetCommand = ReactiveCommand.CreateFromTask(async () =>
 			{
 				StatusInfo = "Generating and augmenting dataset... Please wait.";
                 
-				// Define paths
 				string rawPath = Path.Combine(AppContext.BaseDirectory, "dataset"); 
 				string outputPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed");
                 
-				// Execute generation on a background thread to keep the UI responsive
 				await Task.Run(() => 
 				{
-					// Call the real implementation
 					_datasetGenerator.ProcessAndExport(rawPath, outputPath);
 				});
                 
 				StatusInfo = $"Dataset successfully generated and saved to {outputPath}.";
 			});
+			#endregion
 			
+			// -------------------------------------- Train/Test --------------------------------------
+			#region Train/Test
 			TrainNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
-            {
-                /*if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
-                {
-                    StatusInfo = "Error: Custom network must be selected for training.";
-                    return;
-                }*/
-                StatusInfo = "Starting custom network training. Loading training data...";
+			{
+				var modelName = _selectedModelIndex == 0 ? "Custom" : "NetML";
+                StatusInfo = $"Starting {modelName} network training. Loading training data...";
 
                 string trainPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed", "train");
 
@@ -286,7 +375,7 @@ namespace UI.ViewModels
                 {
                     try
                     {
-                        SyncLayersToDto(); // Синхронизируем настройки UI с DTO перед обучением
+                        SyncLayersToDto(); 
                         var trainDataset = _datasetGenerator.LoadDataset(trainPath); 
 
                         if (trainDataset.Count == 0)
@@ -295,8 +384,9 @@ namespace UI.ViewModels
                             return; 
                         }
 						
-						
 						NeuralNetworkConfig config = new NeuralNetworkConfig();
+						Debug.Assert(_config.HiddenLayerNeurons != null, "_config.HiddenLayerNeurons != null");
+						
 						config.InputSize = _config.InputSize;
 						config.HiddenLayerNeurons = _config.HiddenLayerNeurons.ToArray();
 						config.TrainingSampleSize = _config.TrainingSampleSize;
@@ -304,9 +394,8 @@ namespace UI.ViewModels
 						config.OutputClasses = _config.OutputClasses;
 						config.AcceptableError = _config.AcceptableError;
 						config.LearningRate = _config.LearningRate;
-
-
-                        _currentClassifiers[_selectedModelIndex] = ServiceLocator.GetClassifier(config, _selectedModelIndex); // Получаем новый классификатор с текущей конфигурацией
+						
+                        _currentClassifiers[_selectedModelIndex] = ServiceLocator.GetClassifier(config, _selectedModelIndex);
                         _currentClassifiers[_selectedModelIndex].Train(trainDataset);
 
                         StatusInfo = $"Network retraining completed. Total samples: {trainDataset.Count}.";
@@ -318,14 +407,8 @@ namespace UI.ViewModels
                 });
             });
 
-            // НОВАЯ РЕАЛИЗАЦИЯ: Команда для кнопки "Тестировать сеть"
             TestNetworkCommand = ReactiveCommand.CreateFromTask(async () =>
             {
-                /*if (!IsMlpSettingsEnabled) // Проверка, что выбрана самописная сеть
-                {
-                    StatusInfo = "Error: Custom network must be selected for testing.";
-                    return;
-                }*/
                 StatusInfo = "Loading test dataset and running test... Please wait.";
 
                 string testPath = Path.Combine(AppContext.BaseDirectory, "dataset_processed", "test");
@@ -342,7 +425,6 @@ namespace UI.ViewModels
                             return; 
                         }
 
-                        // Тестируем текущий экземпляр классификатора
                         float accuracy = _currentClassifiers[_selectedModelIndex].Test(testDataset);
                         
                         StatusInfo = $"Test complete. Accuracy: {accuracy:P2} over {testDataset.Count} samples.";
@@ -353,22 +435,128 @@ namespace UI.ViewModels
                     }
                 });
             });
+			#endregion
         }
+		
+		// -------------------------------------- DrawingFuncs --------------------------------------
+		#region Drawing
+		public void ClearDrawing()
+		{
+			var newBitmap = new WriteableBitmap(
+				new PixelSize(DrawWidth, DrawHeight), 
+				_canvasDpi, 
+				PixelFormat.Bgra8888, 
+				AlphaFormat.Opaque);
+
+			using (var buffer = newBitmap.Lock())
+			{
+				unsafe
+				{
+					uint* ptr = (uint*)buffer.Address;
+					int length = DrawWidth * DrawHeight;
+					for (int i = 0; i < length; i++)
+						ptr[i] = BlackUInt;
+				}
+			}
+			
+			DrawingBitmap = newBitmap; 
+		}
+
+        public void DrawLine(int x0, int y0, int x1, int y1)
+        {
+            using (var buffer = _drawingBitmap.Lock())
+            {
+                unsafe
+                {
+                    uint* ptr = (uint*)buffer.Address;
+                    int stride = buffer.RowBytes / 4; 
+
+                    int dx = Math.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+                    int dy = -Math.Abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+                    int err = dx + dy, e2;
+
+                    while (true)
+                    {
+                        if (x0 >= 0 && x0 < DrawWidth && y0 >= 0 && y0 < DrawHeight)
+                        {
+                            ptr[y0 * stride + x0] = WhiteUInt;
+                        }
+
+                        if (x0 == x1 && y0 == y1) break;
+                        e2 = 2 * err;
+                        if (e2 >= dy) { err += dy; x0 += sx; }
+                        if (e2 <= dx) { err += dx; y0 += sy; }
+                    }
+                }
+            }
+            this.RaisePropertyChanged(nameof(DrawingBitmap));
+        }
+
+        public void ClassifyDrawing()
+        {
+            float[] pixels = new float[DrawWidth * DrawHeight];
+
+            using (var buffer = _drawingBitmap.Lock())
+            {
+                unsafe
+                {
+                    uint* ptr = (uint*)buffer.Address;
+                    int stride = buffer.RowBytes / 4;
+
+                    for (int y = 0; y < DrawHeight; y++)
+                    {
+                        for (int x = 0; x < DrawWidth; x++)
+                        {
+                            uint pixel = ptr[y * stride + x];
+                            // B = (pixel & 0xFF)
+                            // G = ((pixel >> 8) & 0xFF)
+                            // R = ((pixel >> 16) & 0xFF)
+                            byte r = (byte)((pixel >> 16) & 0xFF);
+                            
+                            // Нормализация 0..1
+                            pixels[y * DrawWidth + x] = r / 255.0f;
+                        }
+                    }
+                }
+            }
+
+            try
+            {
+                var image = new GreekSymbolImage(pixels);
+                var result = _currentClassifiers[_selectedModelIndex].Predict(image);
+                PredictionResult = result.Symbol.ToString();
+                Confidence = result.Confidence * 100;
+            }
+            catch (Exception ex)
+            {
+                PredictionResult = "Ошибка";
+                StatusInfo = ex.Message;
+            }
+        }
+		#endregion
+		
+        public void SyncLayersToDto()
+        {
+            _config.HiddenLayerNeurons.Clear();
+            foreach (var layer in EditableHiddenLayers)
+            {
+                _config.HiddenLayerNeurons.Add(layer.Neurons);
+            }
+        }
+		
+		// -------------------------------------- CameraFuncs --------------------------------------
+		#region CameraFuncs
         private void StartCamera()
         {
             try
             {
                 Debug.WriteLine("Попытка запуска камеры...");
         
-                // Попробуйте явно указать API (DSHOW часто работает лучше на Windows)
-                // Если DSHOW не подчеркивается, добавьте using OpenCvSharp;
-                // Если ошибка - верните просто new VideoCapture(0);
                 if (_capture == null) _capture = new VideoCapture(0); 
 
                 if (_capture.IsOpened())
                 {
                     Debug.WriteLine($"Камера открыта успешно! Backend: {_capture.GetBackendName()}");
-                    // Настройка разрешения (опционально, может помочь если камера не дает картинку)
                     _capture.Set(VideoCaptureProperties.FrameWidth, 640);
                     _capture.Set(VideoCaptureProperties.FrameHeight, 480);
             
@@ -394,12 +582,6 @@ namespace UI.ViewModels
 		        StatusInfo = "Нет изображения с камеры.";
 		        return;
 		    }
-		    
-		    if (_currentClassifiers[_selectedModelIndex] == null)
-		    {
-		        PredictionResult = "Сеть не выбрана";
-		        return;
-		    }
 		
 		    try
 		    {
@@ -421,7 +603,7 @@ namespace UI.ViewModels
             _cameraTimer.Stop();
             _capture?.Dispose();
             _capture = null;
-            CameraFeed = null; // Очищаем картинку
+            CameraFeed = null;
         }
 
         private void CameraTimer_Tick(object? sender, EventArgs e)
@@ -429,7 +611,7 @@ namespace UI.ViewModels
             if (_capture != null && _capture.IsOpened())
             {
                 using var frame = new Mat();
-                bool readSuccess = _capture.Read(frame); // Возвращает true/false
+                bool readSuccess = _capture.Read(frame);
 
                 if (!readSuccess)
                 {
@@ -443,270 +625,20 @@ namespace UI.ViewModels
                     return;
                 }
 
-                // Если дошли сюда, значит кадр получен. Пробуем конвертировать.
                 try 
                 {
-                    _latestFrame = frame.Clone(); // Сохраняем для нейросети
+                    _latestFrame = frame.Clone();
 
-                    // Конвертация
-                    using (var stream = frame.ToMemoryStream(".bmp")) 
-                    {
-                        stream.Position = 0;
-                        // ВАЖНО: Создание битмапа должно происходить в UI потоке, 
-                        // но DispatcherTimer и так работает в UI потоке.
-                        CameraFeed = new Bitmap(stream);
-                    }
-                }
+					using var stream = frame.ToMemoryStream(".bmp");
+					stream.Position = 0;
+					CameraFeed = new Bitmap(stream);
+				}
                 catch (Exception ex)
                 {
                     Debug.WriteLine($"Ошибка конвертации кадра: {ex.Message}");
                 }
             }
         }
-		#region Drawing
-
-		public void ClearDrawing()
-		{
-			// Создаем НОВЫЙ битмап. Это заставит UI гарантированно обновиться через Binding,
-			// так как изменится ссылка на объект.
-			var newBitmap = new WriteableBitmap(
-				new PixelSize(DrawWidth, DrawHeight), 
-				new Vector(96, 96), 
-				PixelFormat.Bgra8888, 
-				AlphaFormat.Opaque);
-
-			using (var buffer = newBitmap.Lock())
-			{
-				unsafe
-				{
-					uint* ptr = (uint*)buffer.Address;
-					int length = DrawWidth * DrawHeight;
-					// Заливка черным
-					for (int i = 0; i < length; i++)
-						ptr[i] = 0xFF000000;
-				}
-			}
-
-			// Присваивание нового объекта вызывает RaiseAndSetIfChanged -> UI обновляется
-			DrawingBitmap = newBitmap; 
-		}
-
-        // Метод рисования линии (вызывается из Code-behind при движении мыши)
-        public void DrawLine(int x0, int y0, int x1, int y1)
-        {
-            using (var buffer = _drawingBitmap.Lock())
-            {
-                unsafe
-                {
-                    uint* ptr = (uint*)buffer.Address;
-                    int stride = buffer.RowBytes / 4; // int stride
-
-                    // Алгоритм Брезенхема
-                    int dx = Math.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
-                    int dy = -Math.Abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
-                    int err = dx + dy, e2;
-
-                    while (true)
-                    {
-                        if (x0 >= 0 && x0 < DrawWidth && y0 >= 0 && y0 < DrawHeight)
-                        {
-                            // Рисуем белым (255,255,255,255) -> 0xFFFFFFFF
-                            ptr[y0 * stride + x0] = 0xFFFFFFFF;
-                        }
-
-                        if (x0 == x1 && y0 == y1) break;
-                        e2 = 2 * err;
-                        if (e2 >= dy) { err += dy; x0 += sx; }
-                        if (e2 <= dx) { err += dx; y0 += sy; }
-                    }
-                }
-            }
-            this.RaisePropertyChanged(nameof(DrawingBitmap));
-        }
-
-        // Классификация нарисованного
-        public void ClassifyDrawing()
-        {
-            if (_currentClassifiers[_selectedModelIndex] == null)
-            {
-                PredictionResult = "Сеть не готова";
-                return;
-            }
-
-            float[] pixels = new float[DrawWidth * DrawHeight];
-
-            using (var buffer = _drawingBitmap.Lock())
-            {
-                unsafe
-                {
-                    uint* ptr = (uint*)buffer.Address;
-                    int stride = buffer.RowBytes / 4;
-
-                    for (int y = 0; y < DrawHeight; y++)
-                    {
-                        for (int x = 0; x < DrawWidth; x++)
-                        {
-                            uint pixel = ptr[y * stride + x];
-                            // Извлекаем компоненты. PixelFormat.Bgra8888
-                            // B = (pixel & 0xFF)
-                            // G = ((pixel >> 8) & 0xFF)
-                            // R = ((pixel >> 16) & 0xFF)
-                            // Берем R канал (так как рисуем ЧБ, они равны)
-                            byte r = (byte)((pixel >> 16) & 0xFF);
-                            
-                            // Нормализация 0..1
-                            pixels[y * DrawWidth + x] = r / 255.0f;
-                        }
-                    }
-                }
-            }
-
-            try
-            {
-                var image = new GreekSymbolImage(pixels);
-                var result = _currentClassifiers[_selectedModelIndex].Predict(image);
-                PredictionResult = result.Symbol.ToString();
-                Confidence = result.Confidence * 100;
-            }
-            catch (Exception ex)
-            {
-                PredictionResult = "Ошибка";
-                StatusInfo = ex.Message;
-            }
-        }
-
 		#endregion
-
-		public bool IsDrawingMode
-		{
-			get => _isDrawingMode;
-            set
-            {
-                this.RaiseAndSetIfChanged(ref _isDrawingMode, value);
-
-                if (_isDrawingMode)
-                {
-                    
-                }
-                else
-                {
-                    
-                }
-            }
-		}
-
-		public WriteableBitmap DrawingBitmap
-		{
-			get => _drawingBitmap;
-			set => this.RaiseAndSetIfChanged(ref _drawingBitmap, value);
-		}
-		
-        // Метод синхронизации: UI (EditableHiddenLayers) -> DTO (_config)
-        // Вызывайте его перед началом обучения
-        public void SyncLayersToDto()
-        {
-            _config.HiddenLayerNeurons.Clear();
-            foreach (var layer in EditableHiddenLayers)
-            {
-                _config.HiddenLayerNeurons.Add(layer.Neurons);
-            }
-        }
-
-        // --- Свойства конфигурации (DTO proxy) ---
-
-        public int InputSize
-        {
-            get => _config.InputSize;
-            set
-            {
-                // Прямая установка в DTO
-                _config.InputSize = value;
-                // Уведомляем UI, что свойство изменилось
-                this.RaisePropertyChanged(); 
-            }
-        }
-
-        public int TrainingSampleSize
-        {
-            get => _config.TrainingSampleSize;
-            set
-            {
-                _config.TrainingSampleSize = value;
-                this.RaisePropertyChanged();
-            }
-        }
-
-        public int Epochs
-        {
-            get => _config.Epochs;
-            set
-            {
-                _config.Epochs = value;
-                this.RaisePropertyChanged();
-            }
-        }
-
-        // ВАЖНО: NumericUpDown использует decimal, а в DTO у нас float.
-        // Делаем свойства-конвертеры.
-
-        public decimal AcceptableErrorUi
-        {
-            get => (decimal)_config.AcceptableError;
-            set
-            {
-                _config.AcceptableError = (float)value;
-                this.RaisePropertyChanged();
-            }
-        }
-
-        public decimal LearningRateUi
-        {
-            get => (decimal)_config.LearningRate;
-            set
-            {
-                _config.LearningRate = (float)value;
-                this.RaisePropertyChanged();
-            }
-        }
-        
-        // --- Свойства UI ---
-
-        public int SelectedModelIndex
-        {
-            get => _selectedModelIndex;
-            set
-            {
-                this.RaiseAndSetIfChanged(ref _selectedModelIndex, value);
-                // Уведомляем зависимое свойство
-                this.RaisePropertyChanged(nameof(IsMlpSettingsEnabled));
-                _currentClassifier = (Classifiers)_selectedModelIndex;
-            }
-        }
-
-        public bool IsMlpSettingsEnabled => SelectedModelIndex == 0;
-        
-        public Bitmap? CameraFeed
-        {
-            get => _cameraFeed;
-            set => this.RaiseAndSetIfChanged(ref _cameraFeed, value);
-        }
-
-        public string PredictionResult
-        {
-            get => _predictionResult;
-            set => this.RaiseAndSetIfChanged(ref _predictionResult, value);
-        }
-
-        public double Confidence
-        {
-            get => _confidence;
-            set => this.RaiseAndSetIfChanged(ref _confidence, value);
-        }
-
-        public string StatusInfo
-        {
-            get => _statusInfo;
-            set => this.RaiseAndSetIfChanged(ref _statusInfo, value);
-        }
     }
 }

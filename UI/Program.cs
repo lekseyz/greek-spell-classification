@@ -17,8 +17,6 @@ public static class ServiceLocator
 	
 	public static IGreekClassifier GetClassifier(NeuralNetworkConfig config, int modelIndex)
 	{
-		// Перезаписываем текущий экземпляр сети, чтобы в дальнейшем 
-		// при вызове GreekClassifier всегда возвращалась последняя обученная/сконфигурированная сеть.
 		if (modelIndex == 0)
 			_currentGreekClassifier = new CustomNeuralNetwork(config);
 		else
