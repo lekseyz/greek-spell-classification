@@ -13,7 +13,7 @@
     </template>
   </category>
   <category><pattern>АЛЬФА</pattern><template><srai>РАССКАЖИ О АЛЬФЕ</srai></template></category>
-  <category><pattern>ЧТО ТАКОЕ АЛЬФА</pattern><template><srai>РАССКАЖИ О АЛЬФЕ</srai></template></category>
+  <category><pattern>ЧТО ТАКОЕ АЛЬФА</pattern><template><srai>РАССКАЖИ О АЛЬФЕ</srai></template></category>  
 
   <category>
     <pattern>РАССКАЖИ О БЕТЕ</pattern>

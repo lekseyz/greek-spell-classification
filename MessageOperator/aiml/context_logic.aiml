@@ -108,9 +108,56 @@
   <category>
   <pattern>RECOGNIZED *</pattern>
   <template>
-    <think><set name="current_topic"><star/></set></think>
+    <think><set name="current_topic"><star/></set>
+    <set name="questioned">true</set></think>
     Я вижу образ: <star/>. Хочешь расскажу о нем подробнее?
   </template>
-</category>
+  </category>
+
+  <category>
+    <pattern>ДАВАЙ</pattern>
+    <template>
+      <condition name="questioned">
+        <li value="true">
+          
+          
+          <condition name="current_topic">
+            <li value="alpha"><srai>РАССКАЖИ О АЛЬФЕ</srai></li>
+            <li value="beta"><srai>РАССКАЖИ О БЕТЕ</srai></li>
+            <li value="gamma"><srai>РАССКАЖИ О ГАММЕ</srai></li>
+            <li value="delta"><srai>РАССКАЖИ О ДЕЛЬТЕ</srai></li>
+            <li value="epsilon"><srai>РАССКАЖИ ОБ ЭПСИЛОН</srai></li>
+            <li value="zeta"><srai>РАССКАЖИ О ДЗЕТЕ</srai></li>
+            <li value="eta"><srai>РАССКАЖИ ОБ ЭТЕ</srai></li>
+            <li value="theta"><srai>РАССКАЖИ О ТЕТЕ</srai></li>
+            <li value="iota"><srai>РАССКАЖИ О ЙОТЕ</srai></li>
+            <li value="kappa"><srai>РАССКАЖИ О КАППЕ</srai></li>
+            <li value="lambda"><srai>РАССКАЖИ О ЛЯМБДЕ</srai></li>
+            <li value="mu"><srai>РАССКАЖИ О МЮ</srai></li>
+            <li value="nu"><srai>РАССКАЖИ О НЮ</srai></li>
+            <li value="xi"><srai>РАССКАЖИ О КСИ</srai></li>
+            <li value="omicron"><srai>РАССКАЖИ ОБ ОМИКРОНЕ</srai></li>
+            <li value="pi"><srai>РАССКАЖИ О ПИ</srai></li>
+            <li value="rho"><srai>РАССКАЖИ О РО</srai></li>
+            <li value="sigma"><srai>РАССКАЖИ О СИГМЕ</srai></li>
+            <li value="tau"><srai>РАССКАЖИ О ТАУ</srai></li>
+            <li value="upsilon"><srai>РАССКАЖИ ОБ ИПСИЛОН</srai></li>
+            <li value="phi"><srai>РАССКАЖИ О ФИ</srai></li>
+            <li value="chi"><srai>РАССКАЖИ О ХИ</srai></li>
+            <li value="psi"><srai>РАССКАЖИ О ПСИ</srai></li>
+            <li value="omega"><srai>РАССКАЖИ ОБ ОМЕГЕ</srai></li>
+            
+            <li>Я помню, что мы что-то обсуждали, но не могу найти информацию об этом.</li>
+          </condition>
+        </li>
+        <li>Что? Уточни, о чем ты хочешь узнать.</li>
+      </condition>
+      <think><set name="questioned">false</set></think>
+    </template>
+  </category>
+
+  <category><pattern>ДА</pattern><template><srai>ДАВАЙ</srai></template></category>
+  <category><pattern>ХОЧУ</pattern><template><srai>ДАВАЙ</srai></template></category>
+  <category><pattern>РАССКАЖИ</pattern><template><srai>ДАВАЙ</srai></template></category>
 
 </aiml>
