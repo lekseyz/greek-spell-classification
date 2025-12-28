@@ -28,23 +28,19 @@ public class MlNetGreekClassifier : IGreekClassifier
     private readonly MLContext _mlContext;
     private ITransformer? _trainedModel;
     private PredictionEngine<InputData, OutputData>? _predictionEngine;
-    
-    // Размеры изображения
-    private const int W = GreekSymbolConstants.ImageWidth;
-    private const int H = GreekSymbolConstants.ImageHeight;
-    private const int Size = GreekSymbolConstants.InputVectorSize;
+	
+    private const int W		= GreekSymbolConstants.ImageWidth;
+    private const int H		= GreekSymbolConstants.ImageHeight;
+    private const int Size	= GreekSymbolConstants.InputVectorSize;
 
     public MlNetGreekClassifier()
     {
-        // Seed фиксирован для воспроизводимости
         _mlContext = new MLContext(seed: 42);
 
-        // Логирование, чтобы видеть прогресс (L-BFGS может думать пару минут)
         _mlContext.Log += (sender, e) =>
         {
             if (e.Kind == Microsoft.ML.Runtime.ChannelMessageKind.Info)
             {
-                // Фильтруем слишком частые сообщения
                 if (e.Message.Contains("Optimization") || e.Message.Contains("Iteration"))
                 {
                     Debug.WriteLine($"[ML.NET]: {e.Message}");
@@ -70,19 +66,16 @@ public class MlNetGreekClassifier : IGreekClassifier
         IDataView dataView = _mlContext.Data.LoadFromEnumerable(trainingData);
 
 		var pipeline = _mlContext.Transforms.Conversion.MapValueToKey("LabelKey", "Label")
-								 .Append(_mlContext.MulticlassClassification.Trainers.LightGbm(
-									 new LightGbmMulticlassTrainer.Options
-									 {
-										 LabelColumnName = "LabelKey",
-										 FeatureColumnName = "PixelFeatures",
-            
-										 NumberOfIterations = 2000, 
-            
-										 LearningRate = 0.05f, 
-            
-										 NumberOfLeaves = 100 
-									 }))
-								 .Append(_mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabelValue", "PredictedLabel"));
+			.Append(_mlContext.MulticlassClassification.Trainers.LightGbm(
+				new LightGbmMulticlassTrainer.Options
+				{
+					LabelColumnName = "LabelKey",
+					FeatureColumnName = "PixelFeatures",
+					NumberOfIterations = 2000,
+					LearningRate = 0.05f,
+					NumberOfLeaves = 100 
+				}))
+			.Append(_mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabelValue", "PredictedLabel"));
 
         Console.WriteLine("Запуск обучения модели (L-BFGS)");
         _trainedModel = pipeline.Fit(dataView);

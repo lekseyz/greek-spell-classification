@@ -1,8 +1,5 @@
 namespace Domain;
 
-/// <summary>
-/// Константы, определяющие размерности изображений и сети.
-/// </summary>
 public static class GreekSymbolConstants
 {
 	public const int ImageWidth = 28;

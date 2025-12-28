@@ -5,20 +5,15 @@ using Domain.Models;
 
 namespace Ml;
 
-/// <summary>
-/// A custom implementation of a Neural Network for classifying Greek letters.
-/// It uses a fully connected architecture (Feed Forward) with Sigmoid activation for hidden layers
-/// and Softmax for the output layer.
-/// </summary>
 public class CustomNeuralNetwork : IGreekClassifier
 {
 	public NeuralNetworkConfig Config { get; private set; }
 	
-    private readonly List<float[]> _weights = new();
-    private readonly List<float[]> _biases = new();
-    private readonly List<int> _layerSizes = new();
+    private readonly List<float[]>	_weights = new();
+    private readonly List<float[]>	_biases = new();
+    private readonly List<int>		_layerSizes = new();
 	private readonly float _learningRate;
-	private readonly int _epochs;
+	private readonly int	_epochs;
 	private readonly float _acceptableError;
 
     private const float BinarizationThreshold = 0.5f;
@@ -38,18 +33,16 @@ public class CustomNeuralNetwork : IGreekClassifier
 		_epochs = config.Epochs;
 		_acceptableError = config.AcceptableError;
 
-		// 1. Define topology: [Input -> Hidden... -> Output]
 		_layerSizes.Add(config.InputSize); 
 		_layerSizes.AddRange(config.HiddenLayerNeurons);
 		_layerSizes.Add(config.OutputClasses);
 
-		// 2. Initialize weights (Xavier/Glorot initialization)
 		InitializeWeights();
 	}
 	
 	private void InitializeWeights()
 	{
-		Random rnd = new Random(123); // Fixed seed for reproducibility
+		Random rnd = new Random(123);
 
 		for (int i = 0; i < _layerSizes.Count - 1; i++)
 		{
@@ -82,10 +75,10 @@ public class CustomNeuralNetwork : IGreekClassifier
 		if (pixelData.Length != _layerSizes[0]) 
 			throw new InvalidInputDataException(_layerSizes[0], pixelData.Length);
 
-		// 1. Preprocessing
+		// Preprocessing
 		float[] currentSignal = pixelData;
 
-		// 2. Forward Pass
+		// Forward Pass
 		for (int i = 0; i < _weights.Count; i++)
 		{
 			int inputSize = _layerSizes[i];
@@ -99,7 +92,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 				currentSignal = ApplyActivation(nextSignal, Tanh);
 		}
 
-		// 3. Result
+		// Result
 		int maxIndex = ArgMax(currentSignal);
     
 		return new PredictionResult
@@ -158,24 +151,22 @@ public class CustomNeuralNetwork : IGreekClassifier
 
 			foreach (var sample in dataset)
 			{
-				// Извлекаем пиксели через sample.image.Pixels
 				if (sample.image.Pixels.Length != inputSize) continue;
 
-				// 1. Prepare Input (Binarize) and Target
+				// Prepare Input (Binarize) and Target
 				float[] input = sample.image.Pixels;
 				float[] target = OneHotEncode(sample.label, _layerSizes.Last());
 
-				// 2. Forward Pass with Caching
+				// Forward Pass with Caching
 				List<float[]> layerActivations = FeedForwardWithCache(input);
 
-				// 3. Calculate Loss and Backpropagate
+				// Calculate Loss and Backpropagate
 				float[] output = layerActivations.Last();
 				totalError += CalculateCrossEntropyLoss(output, target);
 
 				Backpropagate(layerActivations, target);
 			}
 
-			// ... остальной код логгирования ошибки без изменений ...
 			float meanError = totalError / dataset.Count;
 			Console.WriteLine($"Epoch {epoch + 1}/{_epochs}, Loss: {meanError:F4}");
 
@@ -223,14 +214,14 @@ public class CustomNeuralNetwork : IGreekClassifier
         int layersCount = _weights.Count; // number of weight matrices
         float[] error = new float[_layerSizes.Last()];
 
-        // 1. Calculate Output Error
+        // Calculate Output Error
         float[] outputLayer = activations.Last();
         for (int i = 0; i < error.Length; i++)
         {
             error[i] = outputLayer[i] - target[i];
         }
 
-        // 2. Iterate backwards from the last layer to the first
+        // Iterate backwards from the last layer to the first
         for (int i = layersCount - 1; i >= 0; i--)
         {
             float[] currentWeights = _weights[i];
@@ -258,12 +249,7 @@ public class CustomNeuralNetwork : IGreekClassifier
                 });
             }
 
-            // 3. Update Weights and Biases (Gradient Descent)
-            // Weight_new = Weight_old - LearningRate * Gradient
-            // Gradient_W = prevActivation^T * error
-            // Gradient_b = error
-
-            // Parallelizing weight updates
+            // Update Weights
             Parallel.For(0, inputSize, row =>
             {
                 for (int col = 0; col < outputSize; col++)
@@ -329,10 +315,7 @@ public class CustomNeuralNetwork : IGreekClassifier
 
 	// --------------------------------------------------- MATH ---------------------------------------------------
 	#region Math
-
-    /// <summary>
-    /// Performs matrix-vector multiplication using parallel processing.
-    /// </summary>
+	
     private float[] MatrixVectorMultiplyParallel(float[] inputVector, float[] weightsMatrix, float[] biases, int rows, int cols)
     {
         float[] result = new float[cols];
